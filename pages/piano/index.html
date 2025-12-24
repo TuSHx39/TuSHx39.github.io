@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>虚拟钢琴</title>
+
+  <!-- 样式 -->
+  <link rel="stylesheet" href="piano.css">
+
+  <!-- 模块脚本 -->
+  <script type="module" src="piano.js" defer></script>
+  <script type="module" src="staff.js" defer></script>
+</head>
+
+<body>
+
+  <!-- ================= 设置按钮 ================= -->
+  <div id="settings-btn" title="设置">
+    <img src="images/setting.png" alt="设置">
+  </div>
+
+  <!-- ================= 设置面板 ================= -->
+  <div id="settings-panel">
+    <div class="settings-content">
+
+      <h2>设置</h2>
+
+      <!-- 1. 主音量 -->
+      <div class="setting-item">
+        <label>主音量</label>
+        <input type="range" id="volume-slider" min="0" max="1" step="0.01">
+      </div>
+
+      <!-- 2. 基准频率 -->
+      <div class="setting-item">
+        <label>A4 基准频率 (Hz)</label>
+        <input type="number" id="base-freq-input" min="400" max="480">
+      </div>
+
+      <!-- 3. 波形 -->
+      <div class="setting-item">
+        <label>波形</label>
+        <select id="waveform-select">
+          <option value="triangle">Triangle</option>
+          <option value="sine">Sine</option>
+          <option value="sawtooth">Sawtooth</option>
+        </select>
+      </div>
+
+      <!-- 4. 音名显示 -->
+      <div class="setting-item">
+        <label>显示音名</label>
+        <input type="checkbox" id="note-name-toggle" checked>
+      </div>
+
+      <!-- 5. 五线谱 -->
+      <div class="setting-item">
+        <label>
+          五线谱
+          <span id="staff-settings-btn" class="mini-gear">⚙</span>
+        </label>
+        <input type="checkbox" id="staff-toggle">
+      </div>
+
+      <!-- 6. 踏板反转 -->
+      <div class="setting-item">
+        <label>踏板反转</label>
+        <input type="checkbox" id="invert-pedal-toggle">
+      </div>
+
+      <!-- 7. 踏板切换 -->
+      <div class="setting-item">
+        <label>踏板切换模式</label>
+        <input type="checkbox" id="toggle-pedal-toggle">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= 标题 ================= -->
+  <div class="info">
+    <h1>虚拟钢琴</h1>
+  </div>
+
+  <!-- ================= 五线谱 ================= -->
+  <canvas id="staff" width="800" height="300"></canvas>
+
+  <!-- ================= 当前音显示 ================= -->
+  <div id="current-note">当前音: -</div>
+
+  <!-- ================= 钢琴滚动容器 ================= -->
+  <div class="piano-wrapper">
+    <div id="piano"></div>
+  </div>
+
+  <!-- ================= 踏板提示 ================= -->
+  <div class="pedal">
+    <span>踏板 (Space)</span>
+  </div>
+
+</body>
+</html>

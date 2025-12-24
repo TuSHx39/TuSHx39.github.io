@@ -1,0 +1,211 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background-color: #fff;
+}
+
+/* 顶部信息 */
+.info {
+  padding: 1rem 2rem;
+  text-align: center;
+}
+
+/* 钢琴滚动容器 */
+.piano-wrapper {
+  width: 100%;
+  max-width: 100%;      /* 保持响应式宽度 */
+  height: 200px;        /* 与白键高度 + 黑键高度适配 */
+  overflow-x: auto;     /* 水平滚动 */
+  overflow-y: hidden;   /* 不垂直滚动 */
+  background: #000000;
+  margin: 40px 0;       /* 上下间距 */
+  display: flex;        /* 让琴键水平排列 */
+  align-items: flex-end; /* 白键底部对齐容器底部 */
+  position: relative;
+}
+
+
+/* 钢琴本体 */
+#piano {
+  display: flex;        /* 横向排列白键 */
+  height: 180px;        /* 与白键高度一致 */
+}
+
+
+/* 白键 */
+.key.white {
+  width: 40px;
+  height: 180px;
+  background: #fff;
+  border: 1px solid #bbb;
+  border-radius: 0 0 6px 6px;
+  margin: 0 0px;
+  position: relative;
+  cursor: pointer;
+}
+
+/* 黑键 */
+.key.black {
+  width: 26px;
+  height: 120px;
+  background: #111;
+  position: absolute;
+  top: 0;
+  z-index: 10;
+  border-radius: 0 0 4px 4px;
+  cursor: pointer;
+}
+
+.note-label {
+  position: absolute;
+  bottom: 5px;
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+  color: #333;
+  pointer-events: none;
+}
+
+#current-note {
+  font-size: 20px;
+  font-weight: bold;
+  min-width: 120px;
+}
+
+/* 按下反馈 */
+.key.white:active {
+  background: #eaeaea;
+}
+
+.key.black:active {
+  background: #333;
+}
+
+/* 踏板区域 */
+.pedal {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background: #444;
+  color: #ddd;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+}
+
+/* 踏板按下状态 */
+body.sustain-on .pedal {
+  background: #888;
+  color: #000;
+}
+
+#staff {
+  display: block;
+  margin: 50px auto; /* 居中 */
+  background: #fff;
+  border: 1px solid #ccc;
+}
+
+#settings-btn {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  z-index: 10001;
+}
+
+#settings-btn img {
+  width: 100%;
+  height: 100%;
+  transition: transform 0.35s ease;
+}
+
+/* 打开状态：旋转 45° */
+#settings-btn.active img {
+  transform: rotate(95deg);
+}
+
+#settings-panel {
+  position: fixed;
+  top: -55vh;
+  left: 8vw;
+  width: 84vw;
+  height: 50vh;
+
+  /* 核心：灰色毛玻璃 */
+  background: rgba(160, 165, 170, 0.18);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+
+  /* 层次感 */
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+
+  border-radius: 0 0 22px 22px;
+  transition: top 0.35s ease;
+
+  z-index: 9000;
+}
+
+.settings-content {
+  padding: 24px 32px;
+  color: #111;
+}
+
+.settings-content h2 {
+  margin-top: 0;
+  font-size: 22px;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0;
+}
+
+.setting-item label {
+  font-size: 16px;
+  color: #222;
+}
+
+.setting-item input,
+.setting-item select {
+  background: rgba(255, 255, 255, 0.5);
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+
+#settings-panel.open {
+  top: 0;
+}
+
+.mini-gear {
+  margin-left: 8px;
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.mini-gear:hover {
+  opacity: 1;
+}
+
+.hide-note-label .note-label {
+  display: none;
+}
