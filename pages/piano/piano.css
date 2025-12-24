@@ -15,16 +15,17 @@ html, body {
 }
 
 .piano-wrapper {
+  position: fixed;
+  bottom: 50px;
+  left: 0;
   width: 100%;
-  max-width: 100%;      
-  height: 200px;        
-  overflow-x: auto;    
-  overflow-y: hidden;  
-  background: #000000;
-  margin: 40px 0;      
-  display: flex;       
-  align-items: flex-end; 
-  position: relative;
+  height: 200px;
+  display: flex;
+  align-items: flex-end;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: #000;
+  z-index: 9999;
 }
 
 #piano {
@@ -67,9 +68,19 @@ html, body {
 }
 
 #current-note {
+  position: fixed;  
+  bottom: 255px;    
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 20px;
-  font-weight: bold;
-  min-width: 120px;
+  color: #111;
+  background: rgba(255,255,255,0.8);
+  padding: 4px 12px;
+  border-radius: 8px;
+  z-index: 10000;
+  width: 90%;  
+  max-width: 100%; 
+  text-align: center;
 }
 
 .key.white:active {
