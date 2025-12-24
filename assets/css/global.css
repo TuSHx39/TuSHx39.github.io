@@ -1,4 +1,3 @@
-/* ===== 基础重置 ===== */
 * {
   box-sizing: border-box;
 }
@@ -12,7 +11,6 @@ html, body {
   color: #111;
 }
 
-/* ===== 页面整体 ===== */
 body {
   display: flex;
   justify-content: center;
@@ -25,7 +23,6 @@ body {
   padding: 2rem;
 }
 
-/* ===== 头部 ===== */
 .header {
   text-align: center;
   margin-bottom: 3rem;
@@ -43,14 +40,12 @@ body {
   color: #666;
 }
 
-/* ===== 卡片区 ===== */
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1.5rem;
 }
 
-/* ===== 单张卡片 ===== */
 .card {
   display: block;
   padding: 1.5rem;
@@ -74,7 +69,6 @@ body {
   color: #555;
 }
 
-/* ===== 悬停效果 ===== */
 .card:hover {
   transform: translateY(-4px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);

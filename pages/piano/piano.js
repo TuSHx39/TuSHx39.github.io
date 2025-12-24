@@ -1,26 +1,18 @@
-/* =======================
- * 1. 常量
- * ======================= */
-const A4_FREQ = 440;
 const A4_MIDI = 69;
 const FIRST_MIDI = 21;
 const LAST_MIDI  = 108;
 const WHITE_KEY_WIDTH = 40;
-
+const A4_FREQ = 440;
 const settings = {
-  volume: 0.5,            // 主音量 0~1
-  baseFreq: 440,          // 基准频率 A4
-  waveform: 'triangle',   // triangle / sine / sawtooth
-  showNoteName: true,     // 是否显示音名
-  showStaff: true,        // 是否显示五线谱
-  invertPedal: false,     // 踏板反转
-  togglePedal: false      // 踏板切换模式
+  volume: 0.3,            
+  baseFreq: 440,          
+  waveform: 'triangle',   
+  showNoteName: true,     
+  showStaff: true,        
+  invertPedal: false,     
+  togglePedal: false      
 };
 
-/* =======================
-
- * 2. 音高系统
- * ======================= */
 const NOTE_NAMES = [
   'C','C#','D','D#','E','F',
   'F#','G','G#','A','A#','B'
@@ -30,34 +22,29 @@ function midiToFreq(midi) {
   return A4_FREQ * Math.pow(2, (midi - A4_MIDI) / 12);
 }
 
-/* =======================
- * 3. Audio Context
- * ======================= */
+
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-// 主音量（总线）
 // 主音量
 const masterGain = audioCtx.createGain();
 masterGain.gain.value = settings.volume;
 masterGain.connect(audioCtx.destination);
 
-// 原来 osc → gain → destination
-// 改为 osc → gain → masterGain
-
-
-/* =======================
- * 4. 状态管理
- * ======================= */
 let sustainOn = false;
 const heldKeys = new Set();
 const activeNotes = new Map();
 
+let settingsOpen = false;
+const settingsBtn = document.getElementById('settings-btn');
+const settingsPanel = document.getElementById('settings-panel');
+
 const currentNoteEl = document.getElementById('current-note');
 const currentNoteCheckbox = document.getElementById('note-name-toggle');
-/* =======================
- * 5. Note On / Off
- * ======================= */
+
+
+
+//音符播放
 function noteOn(midi) {
   if (activeNotes.has(midi)) return;
 
@@ -70,16 +57,16 @@ function noteOn(midi) {
 
   const gain = audioCtx.createGain();
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.linearRampToValueAtTime(0.4, now + 0.01); // 单音最大响度也稍微收紧
+  gain.gain.linearRampToValueAtTime(0.4, now + 0.01); 
 
 
-  osc.connect(gain).connect(masterGain); // ❗ 不再直接 connect(destination)
+  osc.connect(gain).connect(masterGain); 
   osc.start(now);
 
   activeNotes.set(midi, { osc, gain });
   heldKeys.add(midi);
 
-  // 显示当前按下音名（多音）
+// 显示当前按下音名
   updateCurrentNotes();
 }
 
@@ -109,11 +96,9 @@ function releaseSustainedNotes() {
   });
 }
 
-/* =======================
- * 6. 当前按下音名显示
- * ======================= */
+//音名显示
 function updateCurrentNotes() {
-  if (!currentNoteCheckbox.checked) return; // 不显示时直接返回
+  if (!currentNoteCheckbox.checked) return; 
 
   if (heldKeys.size === 0) {
     currentNoteEl.textContent = '当前音: -';
@@ -130,9 +115,8 @@ function updateCurrentNotes() {
 
   currentNoteEl.textContent = '当前音: ' + notes.join(' , ');
 }
-/* =======================
- * 7. 键盘生成
- * ======================= */
+
+//键盘生成
 function buildKeyboard() {
   const piano = document.getElementById('piano');
   piano.innerHTML = '';
@@ -141,8 +125,8 @@ function buildKeyboard() {
 
   for (let midi = FIRST_MIDI; midi <= LAST_MIDI; midi++) {
     const note = NOTE_NAMES[midi % 12];
-    const octave = Math.floor(midi / 12) - 1; // MIDI 21 -> A0
-    const fullNoteName = note + octave; // e.g., C4, D4
+    const octave = Math.floor(midi / 12) - 1; 
+    const fullNoteName = note + octave; 
 
     if (!note.includes('#')) {
       const white = document.createElement('div');
@@ -150,7 +134,7 @@ function buildKeyboard() {
       white.dataset.midi = midi;
       white.dataset.note = fullNoteName; // 存储完整音高
 
-      // 只标 C
+      // 标注C键
       const label = document.createElement('span');
       label.className = 'note-label';
       label.textContent = note === 'C' ? fullNoteName : '';
@@ -186,9 +170,8 @@ function buildKeyboard() {
       (wrapper.scrollWidth - wrapper.clientWidth) / 2;
   });
 }
-/* =======================
- * 8. 交互
- * ======================= */
+
+//交互
 function bindEvents() {
   document.addEventListener('mousedown', e => {
     const key = e.target.closest('.key');
@@ -232,6 +215,11 @@ function bindEvents() {
       document.body.classList.remove('settings-open');
     }
   });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && settingsOpen) {
+      closeSettings();
+    }
+  }); 
 }
 
 function bindSettingsPanel() {
@@ -250,19 +238,6 @@ function settingChanged() {
     currentNoteEl.style.visibility = currentNoteCheckbox.checked ? 'visible' : 'hidden';
   });
 }
-/* =======================
- * 9. 初始化
- * ======================= */
-
-buildKeyboard();
-bindEvents();
-bindSettingsPanel();
-settingChanged();
-
-const settingsBtn = document.getElementById('settings-btn');
-const settingsPanel = document.getElementById('settings-panel');
-
-let settingsOpen = false;
 
 function openSettings() {
   settingsOpen = true;
@@ -276,28 +251,8 @@ function closeSettings() {
   settingsBtn.classList.remove('active');
 }
 
-// 点击齿轮
-settingsBtn.addEventListener('click', e => {
-  e.stopPropagation();
-  settingsOpen ? closeSettings() : openSettings();
-});
 
-// 点击空白处关闭
-document.addEventListener('click', e => {
-  if (!settingsOpen) return;
-
-  // 点到面板或按钮内部不关闭
-  if (
-    settingsPanel.contains(e.target) ||
-    settingsBtn.contains(e.target)
-  ) return;
-
-  closeSettings();
-});
-
-// ESC 键关闭
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && settingsOpen) {
-    closeSettings();
-  }
-});
+buildKeyboard();
+bindEvents();
+bindSettingsPanel();
+settingChanged();

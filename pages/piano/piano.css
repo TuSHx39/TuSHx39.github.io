@@ -9,31 +9,27 @@ html, body {
   background-color: #fff;
 }
 
-/* 顶部信息 */
 .info {
   padding: 1rem 2rem;
   text-align: center;
 }
 
-/* 钢琴滚动容器 */
 .piano-wrapper {
   width: 100%;
-  max-width: 100%;      /* 保持响应式宽度 */
-  height: 200px;        /* 与白键高度 + 黑键高度适配 */
-  overflow-x: auto;     /* 水平滚动 */
-  overflow-y: hidden;   /* 不垂直滚动 */
+  max-width: 100%;      
+  height: 200px;        
+  overflow-x: auto;    
+  overflow-y: hidden;  
   background: #000000;
-  margin: 40px 0;       /* 上下间距 */
-  display: flex;        /* 让琴键水平排列 */
-  align-items: flex-end; /* 白键底部对齐容器底部 */
+  margin: 40px 0;      
+  display: flex;       
+  align-items: flex-end; 
   position: relative;
 }
 
-
-/* 钢琴本体 */
 #piano {
-  display: flex;        /* 横向排列白键 */
-  height: 180px;        /* 与白键高度一致 */
+  display: flex;   
+  height: 180px;     
 }
 
 
@@ -49,7 +45,6 @@ html, body {
   cursor: pointer;
 }
 
-/* 黑键 */
 .key.black {
   width: 26px;
   height: 120px;
@@ -77,7 +72,6 @@ html, body {
   min-width: 120px;
 }
 
-/* 按下反馈 */
 .key.white:active {
   background: #eaeaea;
 }
@@ -86,7 +80,6 @@ html, body {
   background: #333;
 }
 
-/* 踏板区域 */
 .pedal {
   position: fixed;
   bottom: 0;
@@ -104,7 +97,6 @@ html, body {
   letter-spacing: 1px;
 }
 
-/* 踏板按下状态 */
 body.sustain-on .pedal {
   background: #888;
   color: #000;
@@ -112,7 +104,7 @@ body.sustain-on .pedal {
 
 #staff {
   display: block;
-  margin: 50px auto; /* 居中 */
+  margin: 50px auto; 
   background: #fff;
   border: 1px solid #ccc;
 }
@@ -133,7 +125,6 @@ body.sustain-on .pedal {
   transition: transform 0.35s ease;
 }
 
-/* 打开状态：旋转 45° */
 #settings-btn.active img {
   transform: rotate(95deg);
 }
@@ -145,12 +136,10 @@ body.sustain-on .pedal {
   width: 84vw;
   height: 50vh;
 
-  /* 核心：灰色毛玻璃 */
   background: rgba(160, 165, 170, 0.18);
   backdrop-filter: blur(18px) saturate(120%);
   -webkit-backdrop-filter: blur(18px) saturate(120%);
 
-  /* 层次感 */
   border: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 
