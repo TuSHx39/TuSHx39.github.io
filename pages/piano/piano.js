@@ -15,6 +15,7 @@ let isMouseDown = false;
 let sustainOn = false;
 let lastMidi = null;
 let spacePressed = false;
+const currentChord = [];
 const heldKeys = new Set();
 const activeNotes = new Map();
 
@@ -32,11 +33,14 @@ const baseFreqInput = document.getElementById('base-freq-input');
 let baseFreq = parseFloat(baseFreqInput.value);
 
 const waveFormSelect = document.getElementById('waveform-select');
-let waveform = waveFormSelect.value;
+let waveForm = waveFormSelect.value;
 
 const currentNoteEl = document.getElementById('current-note');
 const currentNoteCheckbox = document.getElementById('note-name-toggle');
 
+const pianoWrapper = document.querySelector('.piano-wrapper');
+const pedal = document.getElementById('pedal');
+const pedalToggleCheckbox = document.getElementById('pedal-toggle');
 const invertPedalCheckbox = document.getElementById('invert-pedal-toggle'); 
 const togglePedalCheckbox = document.getElementById('toggle-pedal-toggle');
 
@@ -63,7 +67,7 @@ function noteOn(midi) {
   }
 
   const osc = audioCtx.createOscillator();
-  osc.type = waveform;
+  osc.type = waveForm;
   osc.frequency.value = freq;
 
   const gain = audioCtx.createGain();
@@ -82,6 +86,7 @@ function noteOn(midi) {
   osc.stop(now + decayTime + 0.05);
 
   updateCurrentNotes();
+  
 }
 
 //音符释放
@@ -136,6 +141,7 @@ function updateCurrentNotes() {
     return;
   }
 
+
   const allMidi = new Set([...heldKeys, ...activeNotes.keys()]);
 
   const notes = Array.from(allMidi)
@@ -145,9 +151,16 @@ function updateCurrentNotes() {
       return key ? key.dataset.note : '';
     })
     .filter(n => n);
-
+  
   currentNoteEl.textContent = '当前音: ' + notes.join(' , ');
 }
+
+// 和弦识别
+// function chordRecognizer() {
+//   const allMidi = new Set([...heldKeys, ...activeNotes.keys()]);
+//   const notes = Array.from(allMidi).sort((a, b) => a - b)
+//   console.log('当前和弦音: ' + notes.join(' , '));
+// }
 
 //键盘生成
 function buildKeyboard() {
@@ -210,6 +223,7 @@ function openSettings() {
   settingsPanel.classList.add('open');
   settingsBtn.classList.add('active');
 }
+
 //关闭设置
 function closeSettings() {
   settingsOpen = false;
@@ -234,6 +248,7 @@ function bindEvents() {
     noteOn(midi);
     heldKeys.add(midi);     // 实际按下的键加入 heldKeys
     updateCurrentNotes();   // 更新显示
+    chordRecognizer();
     lastMidi = null;
   });
 
@@ -334,23 +349,25 @@ function bindEvents() {
     }
   });
   // ESC关闭设置面板
-  document.addEventListener('keydown', e => {
+  document.addEventListener('keydown', e => {``
     if (!settingsOpen) return;
     if (e.key === 'Escape') {
-      settingsPanel.classList.remove('open');
-      document.body.classList.remove('settings-open');
+      closeSettings();
     }
   });
 }
 
+//设置面板开关
 function bindSettingsPanel() {
-  const btn = document.getElementById('settings-btn');
-  const panel = document.getElementById('settings-panel');
-
-  if (!btn || !panel) return;
-
-  btn.addEventListener('click', () => {
-    panel.classList.toggle('open');
+  if (!settingsBtn || !settingsPanel) return;
+  settingsBtn.addEventListener('click', () => {
+    if (settingsOpen) {
+      closeSettings();
+      return;
+    }
+    else{
+      openSettings();
+    }
   });
 }
 
@@ -371,7 +388,13 @@ function settingChanged() {
   });
   // 波形选择
   waveFormSelect.addEventListener('change', () => {
-    waveform = waveFormSelect.value;
+    waveForm = waveFormSelect.value;
+  });
+  // 踏板开关
+  pedalToggleCheckbox.addEventListener('change', () => {
+    pedal.style.visibility = pedalToggleCheckbox.checked ? 'visible' : 'hidden';
+    pianoWrapper.style.bottom = pedalToggleCheckbox.checked ? '50px' : '0px';
+    currentNoteEl.style.bottom = pedalToggleCheckbox.checked ? '255px' : '205px';
   });
   // 踏板反转
   invertPedalCheckbox.addEventListener('change', () => {
@@ -382,6 +405,7 @@ function settingChanged() {
       document.body.classList.remove('sustain-on');
     }
   });
+  // 踏板切换
   togglePedalCheckbox.addEventListener('change', () => {
     sustainOn = false;
     document.body.classList.remove('sustain-on');
@@ -389,7 +413,15 @@ function settingChanged() {
   });
 }
 
-buildKeyboard();
-bindEvents();
-bindSettingsPanel();
-settingChanged();
+//初始化
+function init() {
+  buildKeyboard();
+  bindEvents();
+  bindSettingsPanel();
+  settingChanged();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+});
+
