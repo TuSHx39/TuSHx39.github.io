@@ -18,54 +18,66 @@
   <div id="settings-panel">
     <div class="settings-content">
 
-      <h2>设置</h2>
+      <div class="settings-pages">
 
-      <div class="setting-item">
-        <label>主音量</label>
-        <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
-      </div>
+        <div class="page main">
 
-      <div class="setting-item">
-        <label>A4 基准频率 (Hz)</label>
-        <input type="number" id="base-freq-input" min="400" max="480" value="440">
-      </div>
+          <div class="setting-item">
+            <label>主音量</label>
+            <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.5">
+          </div>
 
-      <div class="setting-item">
-        <label>波形</label>
-        <select id="waveform-select">
-          <option value="triangle">Triangle</option>
-          <option value="sine">Sine</option>
-          <option value="square">Square</option>
-          <option value="sawtooth">Sawtooth</option>
-        </select>
-      </div>
+          <div class="setting-item">
+            <label>A4 基准频率 (Hz)</label>
+            <input type="number" id="base-freq-input" min="400" max="480" value="440">
+          </div>
 
-      <div class="setting-item">
-        <label>显示音名</label>
-        <input type="checkbox" id="note-name-toggle" checked>
-      </div>
+          <div class="setting-item">
+            <label>波形</label>
+            <select id="waveform-select">
+              <option value="triangle">Triangle</option>
+              <option value="sine">Sine</option>
+              <option value="square">Square</option>
+              <option value="sawtooth">Sawtooth</option>
+            </select>
+          </div>
 
-      <!-- <div class="setting-item">
-        <label>
-          五线谱
-          <span id="staff-settings-btn" class="mini-gear">⚙</span>
-        </label>
-        <input type="checkbox" id="staff-toggle" checked>
-      </div> -->
+          <div class="setting-item">
+            <label>显示音名</label>
+            <input type="checkbox" id="note-name-toggle" checked>
+          </div>
 
-      <div class="setting-item">
-        <label>显示踏板</label>
-        <input type="checkbox" id="pedal-toggle" checked>
-      </div>
-      
-      <div class="setting-item">
-        <label>踏板反转</label>
-        <input type="checkbox" id="invert-pedal-toggle">
-      </div>
+          <div class="setting-item has-sub" data-sub="pedal-settings">
+            <label>踏板设置</label>
+            <button class="pedal-sub-btn">
+              <span class="arrow"></span>
+            </button>
+  
+          </div>
 
-      <div class="setting-item">
-        <label>踏板切换模式</label>
-        <input type="checkbox" id="toggle-pedal-toggle">
+        </div>
+
+        <div class="page sub" id="sub-pedal-settings">
+          <div class="sub-header">
+            <button class="back-btn" id="back-btn"></button>
+            <h2>踏板设置</h2>
+          </div>
+          <div class="setting-item">
+            <label>显示踏板</label>
+            <input type="checkbox" id="pedal-toggle" checked>
+          </div>
+          
+          <div class="setting-item">
+            <label>踏板反转</label>
+            <input type="checkbox" id="invert-pedal-toggle">
+          </div>
+
+          <div class="setting-item">
+            <label>踏板切换模式</label>
+            <input type="checkbox" id="toggle-pedal-toggle">
+          </div>
+
+        </div>
       </div>
     </div>
   </div>

@@ -49,7 +49,7 @@ html, body {
 .key.black {
   width: 26px;
   height: 120px;
-  background: #111;
+  background: #000000;
   position: absolute;
   top: 0;
   z-index: 10;
@@ -161,13 +161,60 @@ body.sustain-on .pedal {
 }
 
 .settings-content {
-  padding: 24px 32px;
-  color: #111;
+  overflow: hidden;
 }
 
 .settings-content h2 {
   margin-top: 0;
   font-size: 22px;
+}
+
+.settings-pages {
+  display: flex;
+  width: 200%;
+  transition: transform 0.35s ease;
+  transform: translateX(0);
+}
+
+.settings-pages.show-sub {
+  transform: translateX(-50%);
+}
+
+.page {
+  width: 100%;
+  padding: 24px 32px;
+  box-sizing: border-box;
+}
+
+.page.main {
+  pointer-events: auto;
+}
+
+.page.sub {
+  pointer-events: auto;
+}
+
+.settings-pages.show-sub .page.main {
+  pointer-events: none;
+}
+
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sub-header h2 {
+  margin: 0;
+}
+
+.setting-item.has-sub {
+  cursor: pointer;
+}
+
+.arrow {
+  font-size: 18px;
+  opacity: 0.6;
 }
 
 .setting-item {
@@ -190,7 +237,6 @@ body.sustain-on .pedal {
   padding: 4px 8px;
 }
 
-
 #settings-panel.open {
   top: 0;
 }
@@ -208,4 +254,46 @@ body.sustain-on .pedal {
 
 .hide-note-label .note-label {
   display: none;
+}
+
+.setting-item.has-sub {
+  cursor: pointer;
+}
+
+.sub-btn {
+  border: none;
+  background: none;
+  font-size: 18px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.sub-btn:hover {
+  opacity: 1;
+}
+
+.settings-subpage {
+  display: none;
+}
+
+.settings-subpage.active {
+  display: block;
+}
+
+.settings-main.hidden {
+  display: none;
+}
+
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.back-btn {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
 }

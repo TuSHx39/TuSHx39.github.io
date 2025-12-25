@@ -11,6 +11,7 @@ const settings = {
 
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
+let debug = 114514;
 let isMouseDown = false;
 let sustainOn = false;
 let lastMidi = null;
@@ -25,6 +26,8 @@ const DECAY_FAST   = 0.4;
 let settingsOpen = false;
 const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
+const pages = document.querySelector('.settings-pages');
+
 
 const volumeSlider = document.getElementById('volume-slider');
 let volume = parseFloat(volumeSlider.value);
@@ -167,10 +170,12 @@ function chordRecognizer() {
     seen.add(r);
     return true;
   });
+  let innerNotes = relativeNotes.map(x => x % 12).sort((a, b) => a - b);
   function triad(){
 
   }
   console.log('当前和弦音: ' + relativeNotes.join(' , '));
+  console.log('当前和弦音（根音八度内）: ' + innerNotes.join(' , '));
 }
 //键盘生成
 function buildKeyboard() {
@@ -362,8 +367,25 @@ function bindEvents() {
   document.addEventListener('keydown', e => {``
     if (!settingsOpen) return;
     if (e.key === 'Escape') {
-      closeSettings();
+      if(pages.classList.contains('show-sub')){
+        pages.classList.remove('show-sub');
+        return;
+      }
+      else{
+        closeSettings();
+      }
     }
+  });
+  document.querySelectorAll('.setting-item.has-sub').forEach(item => {
+    item.addEventListener('click', () => {
+      pages.classList.add('show-sub');
+    });
+  });
+  document.querySelectorAll('.back-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      console.log(debug); 
+      pages.classList.remove('show-sub');
+    });
   });
 }
 
@@ -408,19 +430,14 @@ function settingChanged() {
   });
   // 踏板反转
   invertPedalCheckbox.addEventListener('change', () => {
-    sustainOn = invertPedalCheckbox.checked ? true : false;
+    sustainOn = !sustainOn; 
     if (sustainOn) {
       document.body.classList.add('sustain-on');
     } else {
       document.body.classList.remove('sustain-on');
     }
   });
-  // 踏板切换
-  togglePedalCheckbox.addEventListener('change', () => {
-    sustainOn = false;
-    document.body.classList.remove('sustain-on');
-    togglePedal = togglePedalCheckbox.checked;
-  });
+  
 }
 
 //初始化
