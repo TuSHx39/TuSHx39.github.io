@@ -156,12 +156,22 @@ function updateCurrentNotes() {
 }
 
 // 和弦识别
-// function chordRecognizer() {
-//   const allMidi = new Set([...heldKeys, ...activeNotes.keys()]);
-//   const notes = Array.from(allMidi).sort((a, b) => a - b)
-//   console.log('当前和弦音: ' + notes.join(' , '));
-// }
+function chordRecognizer() {
+  const allMidi = new Set([...heldKeys, ...activeNotes.keys()]);
+  const notes = Array.from(allMidi).sort((a, b) => a - b);
+  let relativeNotes = notes.map(x => x - notes[0]);
+  const seen = new Set();
+  relativeNotes = relativeNotes.filter(x => {
+    const r = ((x % 12) + 12) % 12; // 防止负数
+    if (seen.has(r)) return false;
+    seen.add(r);
+    return true;
+  });
+  function triad(){
 
+  }
+  console.log('当前和弦音: ' + relativeNotes.join(' , '));
+}
 //键盘生成
 function buildKeyboard() {
   const piano = document.getElementById('piano');
