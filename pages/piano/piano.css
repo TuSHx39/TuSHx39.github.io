@@ -83,6 +83,22 @@ html, body {
   text-align: center;
 }
 
+#current-chord {
+  position: fixed;  
+  bottom: 300px;    
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  color: #111;
+  background: rgba(255,255,255,0.8);
+  padding: 4px 12px;
+  border-radius: 8px;
+  z-index: 10000;
+  width: 90%;  
+  max-width: 100%; 
+  text-align: center;
+}
+
 .key.white:active {
   background: #eaeaea;
 }

@@ -11,12 +11,22 @@ const settings = {
 
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
+const CHORD_MAP = {
+  "0,4,7": "",
+  "0,3,7": "m",
+  "0,4,7,10": "7",
+  "0,4,7,11": "maj7",
+  "0,3,7,10": "m7",
+  "0,3,6,10": "m7b5"
+};
+
 let debug = 114514;
 let isMouseDown = false;
 let sustainOn = false;
 let lastMidi = null;
 let spacePressed = false;
 const currentChord = [];
+const chordType = [];
 const heldKeys = new Set();
 const activeNotes = new Map();
 
@@ -40,6 +50,8 @@ let waveForm = waveFormSelect.value;
 
 const currentNoteEl = document.getElementById('current-note');
 const currentNoteCheckbox = document.getElementById('note-name-toggle');
+const currentChordEl =document.getElementById('current-chord')
+const currentChordCheckbox = document.getElementById('chord-toggle')
 
 const pianoWrapper = document.querySelector('.piano-wrapper');
 const pedal = document.getElementById('pedal');
@@ -158,8 +170,20 @@ function updateCurrentNotes() {
   currentNoteEl.textContent = '当前音: ' + notes.join(' , ');
 }
 
+//基础和弦识别
+function basicChord(innerNotes) {
+  return CHORD_MAP[innerNotes.join(',')];
+}
+
 // 和弦识别
 function chordRecognizer() {
+  if(!currentChordCheckbox.checked)return;
+
+  if (heldKeys.size === 0 && activeNotes.size === 0) {
+    currentChordEl.textContent = '当前和弦: -';
+    return;
+  }
+
   const allMidi = new Set([...heldKeys, ...activeNotes.keys()]);
   const notes = Array.from(allMidi).sort((a, b) => a - b);
   let relativeNotes = notes.map(x => x - notes[0]);
@@ -171,12 +195,25 @@ function chordRecognizer() {
     return true;
   });
   let innerNotes = relativeNotes.map(x => x % 12).sort((a, b) => a - b);
-  function triad(){
+  
+  const rootNotes = NOTE_NAMES[notes[0] % 12];
 
+  let chordType = basicChord(innerNotes);
+  
+  // console.log('当前音:' + notes.join(' , '))
+  // console.log('当前和弦音: ' + relativeNotes.join(' , '));
+  // console.log('当前和弦音（根音八度内）: ' + innerNotes.join(' , '));
+  
+  if (chordType === undefined ) {
+    currentChordEl.textContent = '当前和弦：-'
+    return;
   }
-  console.log('当前和弦音: ' + relativeNotes.join(' , '));
-  console.log('当前和弦音（根音八度内）: ' + innerNotes.join(' , '));
+  else{
+    currentChordEl.textContent = '当前和弦：' + rootNotes + chordType;
+    chordType = undefined;
+  }
 }
+
 //键盘生成
 function buildKeyboard() {
   const piano = document.getElementById('piano');
@@ -304,6 +341,7 @@ function bindEvents() {
     heldKeys.forEach(midi => noteOff(midi));
     heldKeys.clear();
     updateCurrentNotes(); // 更新显示
+    chordRecognizer()
   });
 
   // 离开窗口释放所有音符
@@ -312,6 +350,7 @@ function bindEvents() {
     heldKeys.clear();
     activeNotes.forEach((_, midi) => releaseNote(midi));
     updateCurrentNotes();
+    chordRecognizer()
   });
   // 按下踏板
   document.addEventListener('keydown', e => {
@@ -325,6 +364,7 @@ function bindEvents() {
         document.body.classList.remove('sustain-on');
         releaseSustainedNotes();
         updateCurrentNotes();
+        chordRecognizer()
       } else {
         // 正常模式：按下空格 → 开启延音
         sustainOn = true;
@@ -336,6 +376,7 @@ function bindEvents() {
         document.body.classList.remove('sustain-on');
         releaseSustainedNotes();
         updateCurrentNotes();
+        chordRecognizer()
         sustainOn = false;
       }
       else{
@@ -361,6 +402,7 @@ function bindEvents() {
       document.body.classList.remove('sustain-on');
       releaseSustainedNotes();
       updateCurrentNotes();
+      chordRecognizer()
     }
   });
   // ESC关闭设置面板
@@ -421,6 +463,9 @@ function settingChanged() {
   // 波形选择
   waveFormSelect.addEventListener('change', () => {
     waveForm = waveFormSelect.value;
+  });
+  currentChordCheckbox.addEventListener('change', () =>{
+    currentChordEl.style.visibility = currentChordCheckbox.checked ? 'visible' : 'hidden';
   });
   // 踏板开关
   pedalToggleCheckbox.addEventListener('change', () => {
