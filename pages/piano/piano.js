@@ -14,10 +14,17 @@ const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const CHORD_MAP = {
   "0,4,7": "",
   "0,3,7": "m",
+  "0,3,6": "dim",
+  "0,4,8": "aug",
   "0,4,7,10": "7",
   "0,4,7,11": "maj7",
   "0,3,7,10": "m7",
-  "0,3,6,10": "m7b5"
+  "0,3,6,10": "m7b5",
+  "0,3,6,9" : "dim7",
+  "0,4,7,9" : "6",
+  "0,3,7,9" : "m6",
+  "0,2,7": "sus2",
+  "0,5,7": "sus4"
 };
 
 let debug = 114514;
@@ -52,6 +59,8 @@ const currentNoteEl = document.getElementById('current-note');
 const currentNoteCheckbox = document.getElementById('note-name-toggle');
 const currentChordEl =document.getElementById('current-chord')
 const currentChordCheckbox = document.getElementById('chord-toggle')
+const chordInversionSetting = document.getElementById('inversion-setting');
+const chordInversionCheckbox = document.getElementById('inversion-toggle');
 
 const pianoWrapper = document.querySelector('.piano-wrapper');
 const pedal = document.getElementById('pedal');
@@ -198,22 +207,70 @@ function chordRecognizer() {
   
   const rootNotes = NOTE_NAMES[notes[0] % 12];
 
-  let chordType = basicChord(innerNotes);
-  
-  // console.log('当前音:' + notes.join(' , '))
-  // console.log('当前和弦音: ' + relativeNotes.join(' , '));
-  // console.log('当前和弦音（根音八度内）: ' + innerNotes.join(' , '));
-  
-  if (chordType === undefined ) {
-    currentChordEl.textContent = '当前和弦：-'
-    return;
-  }
+  console.log('当前音:' + notes.join(' , '))
+  console.log('当前和弦音: ' + relativeNotes.join(' , '));
+  console.log('当前和弦音（根音八度内）: ' + innerNotes.join(' , '));
+  if (chordInversionCheckbox.checked){
+    let rootResult = null;
+    let inversionResults = [];
+
+    for (let i = 0; i < innerNotes.length; i++) {
+      const assumedRoot = innerNotes[i];
+
+      const testNotes = innerNotes
+        .map(n => (n - assumedRoot + 12) % 12)
+        .sort((a, b) => a - b);
+
+      const chordType = basicChord(testNotes);
+      if (chordType === undefined) continue;
+
+      const realRoot =
+        NOTE_NAMES[(notes[0] + assumedRoot) % 12];
+      const bass =
+        NOTE_NAMES[notes[0] % 12];
+
+      if (assumedRoot === 0) {
+        // 根位
+        rootResult = realRoot + chordType;
+      } else {
+        // 转位
+        inversionResults.push(
+          realRoot + chordType + '/' + bass
+        );
+      }
+    }
+
+    // ===== 输出规则 =====
+
+    if (rootResult) {
+      // 有根位 → 只输出根位
+      currentChordEl.textContent =
+        '当前和弦：' + rootResult;
+    } else if (inversionResults.length > 0) {
+      // 只有转位 → 全部输出
+      currentChordEl.textContent =
+        '当前和弦：' + inversionResults.join(' 或 ');
+    } else {
+      // 全部无法识别
+      currentChordEl.textContent = '当前和弦：-';
+  }}
   else{
-    currentChordEl.textContent = '当前和弦：' + rootNotes + chordType;
-    chordType = undefined;
+    let chordType = basicChord(innerNotes);
+    if (chordType === undefined ) {
+      currentChordEl.textContent = '当前和弦：-'
+      return;
+    }
+    else{
+      currentChordEl.textContent = '当前和弦：' + rootNotes + chordType;
+      chordType = undefined;
+    }
   }
 }
 
+//允许转位开关显示
+function updateInversionState() {
+  chordInversionSetting.classList.toggle('show', currentChordCheckbox.checked);
+}
 //键盘生成
 function buildKeyboard() {
   const piano = document.getElementById('piano');
@@ -482,7 +539,8 @@ function settingChanged() {
       document.body.classList.remove('sustain-on');
     }
   });
-  
+  //转位开关显示
+  currentChordCheckbox.addEventListener('change', updateInversionState);
 }
 
 //初始化
@@ -491,6 +549,7 @@ function init() {
   bindEvents();
   bindSettingsPanel();
   settingChanged();
+  updateInversionState();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
