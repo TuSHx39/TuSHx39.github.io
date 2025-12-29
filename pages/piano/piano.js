@@ -11,7 +11,102 @@ const settings = {
 
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
-const CHORD_MAP = {
+const ALL_CHORD_MAP = {
+  "0,4,7": "",
+  "0,3,7": "m",
+  "0,3,6": "dim",
+  "0,4,8": "aug",
+
+  "0,2,7": "sus2",
+  "0,5,7": "sus4",
+
+  "0,4,7,9": "6",
+  "0,3,7,9": "m6",
+
+  "0,4,7,10": "7",
+  "0,4,7,11": "maj7",
+  "0,3,7,10": "m7",
+  "0,3,6,10": "m7b5",
+  "0,3,6,9": "dim7",
+
+  "0,4,10": "7",
+  "0,4,11": "maj7",
+  "0,3,10": "m7",
+  "0,3,9": "dim7",
+
+  "0,4,7,14": "add9",
+  "0,3,7,14": "madd9",
+
+  "0,4,7,9,14": "6/9",
+  "0,4,9,14": "6/9",
+  "0,3,7,9,14": "m6/9",
+  "0,3,9,14": "m6/9",
+
+  "0,4,7,10,14": "9",
+  "0,4,10,14": "9",
+  "0,4,7,14": "9",
+  "0,4,14": "9",
+
+  "0,3,7,10,14": "m9",
+  "0,3,10,14": "m9",
+  "0,3,7,14": "m9",
+  "0,3,14": "m9",
+
+  "0,4,7,11,14": "maj9",
+  "0,4,11,14": "maj9",
+  "0,4,7,14": "maj9",
+  "0,4,14": "maj9",
+
+  "0,4,7,10,17": "11",
+  "0,4,10,17": "11",
+  "0,4,7,14,17": "11",
+  "0,4,10,14,17": "11",
+  "0,4,17": "11",
+
+  "0,3,7,10,17": "m11",
+  "0,3,10,17": "m11",
+  "0,3,7,14,17": "m11",
+  "0,3,10,14,17": "m11",
+  "0,3,17": "m11",
+
+  "0,4,7,10,21": "13",
+  "0,4,10,21": "13",
+  "0,4,7,14,21": "13",
+  "0,4,10,14,21": "13",
+  "0,4,7,17,21": "13",
+  "0,4,21": "13",
+
+  "0,3,7,10,21": "m13",
+  "0,3,10,21": "m13",
+  "0,3,7,14,21": "m13",
+  "0,3,10,14,21": "m13",
+  "0,3,7,17,21": "m13",
+  "0,3,21": "m13",
+
+  "0,4,7,11,21": "maj13",
+  "0,4,11,21": "maj13",
+  "0,4,7,14,21": "maj13",
+  "0,4,11,14,21": "maj13",
+  "0,4,7,17,21": "maj13",
+  "0,4,21": "maj13",
+
+  "0,5,7,10": "7sus4",
+  "0,5,10": "7sus4",
+
+  "0,5,7,10,14": "9sus4",
+  "0,5,10,14": "9sus4",
+  "0,5,14": "9sus4",
+
+  "0,5,7,10,21": "13sus4",
+  "0,5,10,21": "13sus4",
+  "0,5,21": "13sus4",
+
+  "0,5,7,9,14" : "6/9sus4",
+  "0,5,9,14": "6/9sus4"
+};
+  
+
+const BASIC_CHORD_MAP = {
   "0,4,7": "",
   "0,3,7": "m",
   "0,3,6": "dim",
@@ -21,11 +116,15 @@ const CHORD_MAP = {
   "0,3,7,10": "m7",
   "0,3,6,10": "m7b5",
   "0,3,6,9" : "dim7",
-  "0,4,7,9" : "6",
-  "0,3,7,9" : "m6",
   "0,2,7": "sus2",
   "0,5,7": "sus4"
 };
+
+const MORE_CHORD_MAP = {
+  "0,4,7,9" : "6",
+  "0,3,7,9" : "m6",
+
+}
 
 let debug = 114514;
 let isMouseDown = false;
@@ -37,8 +136,8 @@ const chordType = [];
 const heldKeys = new Set();
 const activeNotes = new Map();
 
-const DECAY_NORMAL = 6 ;
-const DECAY_FAST   = 0.4;
+const DECAY_NORMAL = 10 ;
+const DECAY_FAST   = 0.5;
 
 let settingsOpen = false;
 const settingsBtn = document.getElementById('settings-btn');
@@ -179,9 +278,15 @@ function updateCurrentNotes() {
   currentNoteEl.textContent = '当前音: ' + notes.join(' , ');
 }
 
-//基础和弦识别
+//和弦识别
 function basicChord(innerNotes) {
-  return CHORD_MAP[innerNotes.join(',')];
+  return BASIC_CHORD_MAP[innerNotes.join(',')];
+}
+function moreChord(innerNotes) {
+  return MORE_CHORD_MAP[innerNotes.join(',')];
+}
+function allChord(relativeNotes) {
+  return ALL_CHORD_MAP[relativeNotes.join(',')];
 }
 
 // 和弦识别
@@ -207,9 +312,10 @@ function chordRecognizer() {
   
   const rootNotes = NOTE_NAMES[notes[0] % 12];
 
-  console.log('当前音:' + notes.join(' , '))
-  console.log('当前和弦音: ' + relativeNotes.join(' , '));
-  console.log('当前和弦音（根音八度内）: ' + innerNotes.join(' , '));
+  // console.log('当前音:' + notes.join(' , '))
+  // console.log('当前和弦音: ' + relativeNotes.join(' , '));
+  // console.log('当前和弦音（根音八度内）: ' + innerNotes.join(' , '));
+
   if (chordInversionCheckbox.checked){
     let rootResult = null;
     let inversionResults = [];
@@ -234,28 +340,21 @@ function chordRecognizer() {
         rootResult = realRoot + chordType;
       } else {
         // 转位
-        inversionResults.push(
-          realRoot + chordType + '/' + bass
-        );
-      }
-    }
-
-    // ===== 输出规则 =====
+        inversionResults.push(realRoot + chordType + '/' + bass);
+    }}
 
     if (rootResult) {
       // 有根位 → 只输出根位
-      currentChordEl.textContent =
-        '当前和弦：' + rootResult;
+      currentChordEl.textContent = '当前和弦：' + rootResult;
     } else if (inversionResults.length > 0) {
       // 只有转位 → 全部输出
-      currentChordEl.textContent =
-        '当前和弦：' + inversionResults.join(' 或 ');
+      currentChordEl.textContent = '当前和弦：' + inversionResults.join(' 或 ');
     } else {
       // 全部无法识别
       currentChordEl.textContent = '当前和弦：-';
   }}
   else{
-    let chordType = basicChord(innerNotes);
+    let chordType = allChord(relativeNotes);
     if (chordType === undefined ) {
       currentChordEl.textContent = '当前和弦：-'
       return;
@@ -263,14 +362,14 @@ function chordRecognizer() {
     else{
       currentChordEl.textContent = '当前和弦：' + rootNotes + chordType;
       chordType = undefined;
-    }
-  }
+  }};
 }
 
 //允许转位开关显示
 function updateInversionState() {
   chordInversionSetting.classList.toggle('show', currentChordCheckbox.checked);
 }
+
 //键盘生成
 function buildKeyboard() {
   const piano = document.getElementById('piano');
@@ -342,9 +441,20 @@ function closeSettings() {
 
 //交互
 function bindEvents() {
+  //滚轮滚动钢琴
+  pianoWrapper.addEventListener('wheel', e => {
+    if (pianoWrapper.scrollWidth <= pianoWrapper.clientWidth) return;
+
+    e.preventDefault(); // 阻止页面纵向滚动
+
+    pianoWrapper.scrollLeft += e.deltaY;
+  }, { passive: false });
+
   // 禁止选中文本
   piano.addEventListener('mousedown', e => e.preventDefault());
   piano.addEventListener('mousemove', e => e.preventDefault());
+  pedal.addEventListener('mousedown', e => e.preventDefault());
+  pedal.addEventListener('mousemove', e => e.preventDefault());
   // 鼠标按下
   piano.addEventListener('mousedown', e => {
     const key = e.target.closest('.key');
@@ -361,7 +471,7 @@ function bindEvents() {
     lastMidi = null;
   });
 
-  // // 鼠标移动划过琴键（滑动奏琴）
+  // 鼠标移动划过琴键（滑动奏琴）
   // piano.addEventListener('mousemove', e => {
   //   if (!isMouseDown) return;
   //   const key = e.target.closest('.key');
@@ -374,15 +484,18 @@ function bindEvents() {
   //   if (lastMidi !== null){
   //     if (sustainOn == false) {
   //       releaseNoteFast(lastMidi);
+      
   //   }}
 
   //   // 触发新滑动音符
   //   noteOn(midi);
+  //   heldKeys.add(midi);
   //   lastMidi = midi;
 
   //   // **立即清除 currentNoteEl 中可能存在的滑动音符**
   //   // currentNoteEl 只显示 heldKeys，所以直接调用 updateCurrentNotes
   //   updateCurrentNotes();
+  //   chordRecognizer();
   // });
 
   // 鼠标释放
@@ -390,8 +503,14 @@ function bindEvents() {
     isMouseDown = false;
 
     if (lastMidi !== null) {
-      releaseNoteFast(lastMidi);
-      lastMidi = null;
+      if(sustainOn == false){
+        releaseNoteFast(lastMidi);
+        lastMidi = null;
+      }
+      else{
+        releaseSustainedNotes(lastMidi);
+        lastMidi = null;
+      }
     }
 
     // 松开鼠标时释放实际按下的键
@@ -409,6 +528,60 @@ function bindEvents() {
     updateCurrentNotes();
     chordRecognizer()
   });
+
+  //点击踏板
+  pedal.addEventListener('mousedown', e => {
+    e.preventDefault();
+    if (isMouseDown) return;
+    isMouseDown = true;
+    if (!togglePedalCheckbox.checked) {
+      if (invertPedalCheckbox.checked) {
+        // 反转模式：按下空格 → 快速释放延音
+        document.body.classList.remove('sustain-on');
+        releaseSustainedNotes();
+        updateCurrentNotes();
+        chordRecognizer()
+      } else {
+        // 正常模式：按下空格 → 开启延音
+        sustainOn = true;
+        document.body.classList.add('sustain-on');
+      }
+    }
+    else{
+      if (sustainOn) {
+        document.body.classList.remove('sustain-on');
+        releaseSustainedNotes();
+        updateCurrentNotes();
+        chordRecognizer()
+        sustainOn = false;
+      }
+      else{
+        document.body.classList.add('sustain-on');
+        sustainOn = true;
+      }
+    }
+  })
+  
+  // 松开踏板点击
+  document.addEventListener('mouseup', e => {
+    e.preventDefault();
+    isMouseDown = false;
+    if (spacePressed) return;
+    if (togglePedalCheckbox.checked) return;
+    if (invertPedalCheckbox.checked) {
+      // 反转模式
+      sustainOn = true;
+      document.body.classList.add('sustain-on');
+    } else {
+      // 正常模式
+      sustainOn = false;
+      document.body.classList.remove('sustain-on');
+      releaseSustainedNotes();
+      updateCurrentNotes();
+      chordRecognizer()
+    }
+  });
+
   // 按下踏板
   document.addEventListener('keydown', e => {
     if (e.code !== 'Space') return;
@@ -443,6 +616,7 @@ function bindEvents() {
     }
   });
 
+  //松开踏板
   document.addEventListener('keyup', e => {
     if (e.code !== 'Space') return;
     spacePressed = false;
