@@ -4,26 +4,39 @@ import assert from 'node:assert/strict';
 import { readHtml, scriptSources, loadYicaiScripts } from './helpers/load-yicai.mjs';
 import { createDom } from './helpers/fake-dom.mjs';
 
-/** 可控定时器：让依赖 setTimeout 的流程（提示清除、答案计算、演示）在测试里可预期地跑完 */
+/**
+ * 可控定时器（虚拟时钟）。
+ * 按「到期时间」顺序执行，和浏览器的定时器队列一致 —— 这样 0/8ms 的自我重排定时器
+ * （最短步数计算的分片）就不会把 30ms 的定时器饿死。
+ */
 function createTimers() {
   let nextId = 1;
+  let now = 0;
   const pending = new Map();
   return {
     setTimeout(fn, ms) {
       const id = nextId++;
-      pending.set(id, { fn, ms: ms || 0 });
+      pending.set(id, { fn, due: now + (ms || 0) });
       return id;
     },
     clearTimeout(id) {
       pending.delete(id);
     },
-    /** 按到期时间顺序执行挂起的回调（最多 limit 次，避免死循环） */
+    /** 执行到没有到期任务为止（最多 limit 次，避免死循环） */
     run(limit = 400) {
       let count = 0;
       while (pending.size && count++ < limit) {
-        const entries = [...pending.entries()].sort((a, b) => a[1].ms - b[1].ms);
-        const [id, job] = entries[0];
-        pending.delete(id);
+        let bestId = null;
+        let bestDue = Infinity;
+        for (const [id, job] of pending) {
+          if (job.due < bestDue || (job.due === bestDue && (bestId === null || id < bestId))) {
+            bestDue = job.due;
+            bestId = id;
+          }
+        }
+        const job = pending.get(bestId);
+        pending.delete(bestId);
+        now = Math.max(now, bestDue);
         job.fn();
       }
       return count;
@@ -229,6 +242,407 @@ test('app：看答案 → 列出步骤，演示默认一步一步，可一键演
   assert.equal(app.demo, null);
   assert.equal(Core.serialize(app.board), before, '退出演示应恢复原局面');
   assert.equal(dom.document.getElementById('demo-controls').hidden, true);
+});
+
+test('app：勾选「强制计算最短步数」后边算边玩，算完只剩最短步数', () => {
+  const { dom, app, Yicai, timers } = boot();
+  // 默认没开 → 栏目隐藏
+  assert.equal(dom.document.getElementById('stat-min-wrap').hidden, true);
+  assert.equal(app.minSteps, null);
+  // 没开时「本题」是：上限 · 参考解 · 唯一解/多解
+  assert.match(textOf(dom, 'stat-difficulty'), /^上限 \d+ 步 · 参考解 \d+ 步/);
+
+  click(dom, 'btn-options');
+  const uniqueBox = dom.document.getElementById('opt-unique');
+  if (uniqueBox.checked) {
+    uniqueBox.checked = false;
+    uniqueBox.dispatch('change', { target: uniqueBox });
+  }
+  const box = dom.document.getElementById('opt-minsteps');
+  box.checked = true;
+  box.dispatch('change', { target: box });
+  assert.equal(app.draft.computeMinSteps, true);
+  // 用 4x4 的小盘面，计算能很快结束
+  const cols = dom.document.getElementById('opt-cols');
+  const rows = dom.document.getElementById('opt-rows');
+  const limit = dom.document.getElementById('opt-limit');
+  cols.value = '4';
+  cols.dispatch('input', { target: cols });
+  rows.value = '4';
+  rows.dispatch('input', { target: rows });
+  limit.value = '6';
+  limit.dispatch('input', { target: limit });
+  click(dom, 'opt-apply');
+  timers.run(200); // 出题 + 计算分片都挂在定时器上（4x4 很快能算完）
+
+  assert.equal(app.settings.computeMinSteps, true);
+  assert.equal(dom.document.getElementById('stat-min-wrap').hidden, false);
+  assert.ok(app.minSteps, '应该有一个最短步数任务');
+  assert.equal(app.minSteps.status, 'done');
+  const exact = app.minSteps.exact;
+  assert.ok(exact >= 1 && exact <= app.puzzle.steps, `算出的最短步数不合理：${exact}`);
+  assert.equal(app.minSteps.lower, exact, '算完后下界应等于确切最短步数');
+  // 算完之后「本题」不再显示参考解，只剩上限
+  const diff = textOf(dom, 'stat-difficulty');
+  assert.match(diff, /^上限 \d+ 步$/);
+  assert.doesNotMatch(diff, /参考解/);
+  // 最短步数那栏只显示步数 + 唯一解/多解（与「尽量出唯一解」开关无关）
+  const minText = textOf(dom, 'stat-minsteps');
+  assert.match(minText, new RegExp('^' + exact + ' 步'));
+  assert.doesNotMatch(minText, /已证明最短/);
+  const expectLabel =
+    app.minSteps.optimalCount === 1
+      ? '唯一解'
+      : app.minSteps.optimalCount >= 2
+        ? '多解'
+        : app.puzzle.unique === true
+          ? '唯一解'
+          : app.puzzle.unique === false
+            ? '多解'
+            : null;
+  if (expectLabel) assert.match(minText, new RegExp('· ' + expectLabel + '$'));
+  // 结果必须真的是最短：少一步应该无解
+  const shorter = Yicai.Solver.search(app.puzzle.board, app.puzzle.target, exact - 1, { timeMs: 4000 });
+  assert.equal(shorter.moves, null, '不该存在更短的解');
+});
+
+test('app：计算期间照常可以落子，也可以点栏目停下来', () => {
+  const { dom, app, Core, Yicai, timers } = boot();
+  click(dom, 'btn-options');
+  const uniqueBox = dom.document.getElementById('opt-unique');
+  if (uniqueBox.checked) {
+    uniqueBox.checked = false;
+    uniqueBox.dispatch('change', { target: uniqueBox });
+  }
+  const box = dom.document.getElementById('opt-minsteps');
+  box.checked = true;
+  box.dispatch('change', { target: box });
+
+  // 用一道「确定很难精确穷举」的盘面（20x15 完全随机、不平滑）导入，
+  // 这样它必然长时间处于计算中，测试不受随机出题影响。
+  const board = Yicai.Generator.randomPuzzle(
+    15,
+    20,
+    null,
+    Core.YELLOW,
+    Yicai.Generator.createRng(7),
+    0
+  );
+  const code = Yicai.Share.encode({
+    rows: 15,
+    cols: 20,
+    target: Core.YELLOW,
+    limit: 15,
+    board,
+    solution: [],
+  });
+  click(dom, 'btn-import');
+  dom.document.getElementById('code-text').value = code;
+  click(dom, 'code-confirm');
+  timers.run(120);
+
+  assert.equal(app.minSteps.status, 'running', '大盘面应该还在计算中');
+  assert.match(textOf(dom, 'stat-minsteps'), /计算中/);
+  assert.match(textOf(dom, 'stat-minsteps'), /最少 ≥ \d+ 步/);
+  // 还在算的时候，本题仍然显示「上限 + 参考解」
+  assert.match(textOf(dom, 'stat-difficulty'), /^上限 \d+ 步 · 参考解 \d+ 步$/);
+
+  // 计算中依然能落子
+  const before = app.history.length;
+  let index = -1;
+  for (let i = 0; i < app.board.cells.length; i++) {
+    if (app.board.cells[i] !== Core.HOLE && app.board.cells[i] !== app.selectedColor) {
+      index = i;
+      break;
+    }
+  }
+  assert.ok(index >= 0);
+  clickCell(dom, index);
+  assert.equal(app.history.length, before + 1, '计算期间应该还能操作棋盘');
+
+  // 点一下栏目 → 停止计算
+  click(dom, 'stat-min-wrap');
+  assert.equal(app.minSteps.status, 'stopped');
+  assert.match(textOf(dom, 'stat-minsteps'), /已停止/);
+  assert.match(textOf(dom, 'message'), /已停止计算最短步数/);
+
+  // 再点一下 → 重新开始
+  click(dom, 'stat-min-wrap');
+  assert.equal(app.minSteps.status, 'running');
+  assert.match(textOf(dom, 'stat-minsteps'), /计算中/);
+});
+
+test('app：关掉「强制计算最短步数」立刻清空并隐藏那一栏（不用重新出题）', () => {
+  const { dom, app, Core, timers } = boot();
+  const snapshot = Core.serialize(app.board);
+  click(dom, 'btn-options');
+  const uniqueBox = dom.document.getElementById('opt-unique');
+  if (uniqueBox.checked) {
+    uniqueBox.checked = false;
+    uniqueBox.dispatch('change', { target: uniqueBox });
+  }
+  const box = dom.document.getElementById('opt-minsteps');
+  box.checked = true;
+  box.dispatch('change', { target: box });
+  timers.run(30);
+  assert.equal(dom.document.getElementById('stat-min-wrap').hidden, false);
+  assert.ok(textOf(dom, 'stat-minsteps').length > 0);
+
+  // 先停掉计算（免得它一直占着定时器队列），再关掉开关
+  click(dom, 'stat-min-wrap');
+  assert.equal(app.minSteps.status, 'stopped');
+  const box2 = dom.document.getElementById('opt-minsteps');
+  box2.checked = false;
+  box2.dispatch('change', { target: box2 });
+
+  assert.equal(app.settings.computeMinSteps, false);
+  assert.equal(app.minSteps, null, '关掉后不该还留着最后一次结果');
+  assert.equal(dom.document.getElementById('stat-min-wrap').hidden, true);
+  assert.equal(textOf(dom, 'stat-minsteps'), '', '栏位文字要清空');
+  assert.equal(Core.serialize(app.board), snapshot, '开关不该重新出题');
+  // 「本题」恢复成 上限 · 参考解 的形式
+  assert.match(textOf(dom, 'stat-difficulty'), /^上限 \d+ 步 · 参考解 \d+ 步/);
+
+  // 再开一次应该能重新算
+  const box3 = dom.document.getElementById('opt-minsteps');
+  box3.checked = true;
+  box3.dispatch('change', { target: box3 });
+  assert.equal(dom.document.getElementById('stat-min-wrap').hidden, false);
+  assert.ok(app.minSteps);
+  click(dom, 'stat-min-wrap');
+});
+
+test('app：开了强制计算 + 唯一解时，算完只在最短步数旁标唯一解', () => {
+  const { dom, app, timers } = boot();
+  click(dom, 'btn-options');
+  const uniqueBox = dom.document.getElementById('opt-unique');
+  uniqueBox.checked = true;
+  uniqueBox.dispatch('change', { target: uniqueBox });
+  const box = dom.document.getElementById('opt-minsteps');
+  box.checked = true;
+  box.dispatch('change', { target: box });
+  const cols = dom.document.getElementById('opt-cols');
+  const rows = dom.document.getElementById('opt-rows');
+  const limit = dom.document.getElementById('opt-limit');
+  cols.value = '4';
+  cols.dispatch('input', { target: cols });
+  rows.value = '4';
+  rows.dispatch('input', { target: rows });
+  limit.value = '4';
+  limit.dispatch('input', { target: limit });
+  click(dom, 'opt-apply');
+
+  // 起初：本题只显示「上限 + 参考解」（不带唯一解标识）
+  const early = textOf(dom, 'stat-difficulty');
+  assert.match(early, /^上限 \d+ 步 · 参考解 \d+ 步$/);
+  assert.doesNotMatch(early, /唯一解|多解/);
+
+  timers.run(400);
+  assert.equal(app.minSteps.status, 'done');
+  // 算完：本题不再显示参考解，唯一解标识挪到最短步数旁边
+  const after = textOf(dom, 'stat-difficulty');
+  assert.match(after, /^上限 \d+ 步$/);
+  assert.doesNotMatch(after, /唯一解|多解/);
+  const minText = textOf(dom, 'stat-minsteps');
+  assert.match(minText, /^\d+ 步/);
+  const expectLabel =
+    app.minSteps.optimalCount === 1
+      ? '唯一解'
+      : app.minSteps.optimalCount >= 2
+        ? '多解'
+        : app.puzzle.unique === true
+          ? '唯一解'
+          : app.puzzle.unique === false
+            ? '多解'
+            : null;
+  if (expectLabel) assert.match(minText, new RegExp('· ' + expectLabel + '$'));
+});
+
+test('app：没开强制计算时，「本题」是 上限 → 参考解 → 唯一解 的顺序', () => {
+  const { dom, app } = boot();
+  const text = textOf(dom, 'stat-difficulty');
+  assert.match(text, /^上限 \d+ 步 · 参考解 \d+ 步/);
+  const iCap = text.indexOf('上限');
+  const iRef = text.indexOf('参考解');
+  assert.ok(iCap < iRef, '步数上限应在参考解左边');
+  if (app.puzzle.unique === true || app.puzzle.unique === false) {
+    const label = app.puzzle.unique === true ? '唯一解' : '多解';
+    assert.match(text, new RegExp(label + '$'), `${label} 标识应放最右边`);
+    assert.ok(iRef < text.indexOf(label));
+  }
+});
+
+test('app：算出最短解后，如果比原参考解更短就把答案也换掉', () => {
+  const { dom, app, Core, Yicai, timers } = boot();
+  // 手工造一道 2x2 的题：答案本来要 2 步，其实 1 步就能完成
+  const board = Core.deserialize('0011', 2, 2);
+  const suboptimal = [
+    { index: 0, color: 2 },
+    { index: 0, color: 1 },
+  ];
+  assert.equal(Core.simulate(board, suboptimal, 1).solved, true, '这条解法本身要有效');
+  const code = Yicai.Share.encode({
+    rows: 2,
+    cols: 2,
+    target: 1,
+    limit: 2,
+    board,
+    solution: suboptimal,
+  });
+  click(dom, 'btn-import');
+  dom.document.getElementById('code-text').value = code;
+  click(dom, 'code-confirm');
+  timers.run(20);
+  assert.equal(app.puzzle.steps, 2, '导入时参考答案是 2 步');
+  assert.equal(app.puzzle.solution.length, 2);
+
+  // 打开强制计算 → 4 格的小题瞬间算完，最短 1 步
+  click(dom, 'btn-options');
+  const box = dom.document.getElementById('opt-minsteps');
+  box.checked = true;
+  box.dispatch('change', { target: box });
+  timers.run(60);
+
+  assert.equal(app.minSteps.status, 'done');
+  assert.equal(app.minSteps.exact, 1);
+  // 参考答案被换成最短解
+  assert.equal(app.puzzle.solution.length, 1, '答案应该换成更短的最短解');
+  assert.equal(app.puzzle.steps, 1);
+  assert.equal(app.puzzle.answerSource, 'shortest');
+  assert.equal(Core.simulate(app.puzzle.board, app.puzzle.solution, app.puzzle.target).solved, true);
+  assert.match(textOf(dom, 'message'), /参考答案也换成了这条最短解/);
+  // 看答案里的说明也跟着变
+  click(dom, 'btn-answer');
+  timers.run(20);
+  assert.match(textOf(dom, 'answer-summary'), /精确计算得到的最短解/);
+  assert.equal(dom.document.getElementById('answer-list').children.length, 1);
+  click(dom, 'answer-close');
+  // 限制步数不受影响（游戏规则不动）
+  assert.equal(app.puzzle.limit, 2);
+});
+
+test('app：最短解没比参考解更短时保持原答案', () => {
+  const { dom, app, timers } = boot();
+  click(dom, 'btn-options');
+  const uniqueBox = dom.document.getElementById('opt-unique');
+  if (uniqueBox.checked) {
+    uniqueBox.checked = false;
+    uniqueBox.dispatch('change', { target: uniqueBox });
+  }
+  const box = dom.document.getElementById('opt-minsteps');
+  box.checked = true;
+  box.dispatch('change', { target: box });
+  const cols = dom.document.getElementById('opt-cols');
+  const rows = dom.document.getElementById('opt-rows');
+  const limit = dom.document.getElementById('opt-limit');
+  cols.value = '4';
+  cols.dispatch('input', { target: cols });
+  rows.value = '4';
+  rows.dispatch('input', { target: rows });
+  limit.value = '6';
+  limit.dispatch('input', { target: limit });
+  click(dom, 'opt-apply');
+  timers.run(300);
+
+  assert.equal(app.minSteps.status, 'done');
+  const before = app.puzzle.solution.map((m) => [m.index, m.color]);
+  // 最短步数只会 ≤ 参考解；只有严格更短时才替换
+  if (app.minSteps.exact < before.length) {
+    assert.equal(app.puzzle.solution.length, app.minSteps.exact);
+  } else {
+    assert.deepEqual(
+      app.puzzle.solution.map((m) => [m.index, m.color]),
+      before
+    );
+    assert.notEqual(app.puzzle.answerSource, 'shortest');
+  }
+});
+
+test('app：没勾「唯一解」也按最优解个数标出唯一解 / 多解', () => {
+  const { dom, app, Core, Yicai, timers } = boot();
+  // 「唯一解」开关保持默认关闭
+  assert.equal(app.settings.preferUnique, false);
+
+  // 0011 → 目标 1：1 步就能完成，而且只有这一种 1 步解法（最优解唯一）
+  const uniqueBoard = Core.deserialize('0011', 2, 2);
+  const uniqueCode = Yicai.Share.encode({
+    rows: 2,
+    cols: 2,
+    target: 1,
+    limit: 2,
+    board: uniqueBoard,
+    solution: [
+      { index: 0, color: 2 },
+      { index: 0, color: 1 },
+    ],
+  });
+  click(dom, 'btn-import');
+  dom.document.getElementById('code-text').value = uniqueCode;
+  click(dom, 'code-confirm');
+  {
+    const m = dom.document.getElementById('opt-minsteps');
+    m.checked = true;
+    m.dispatch('change', { target: m });
+  }
+  timers.run(80);
+  assert.equal(app.minSteps.status, 'done');
+  assert.equal(app.minSteps.exact, 1);
+  assert.equal(app.minSteps.optimalCount, 1, '最优解个数应为 1');
+  // 这条题是从分享码导入的，出题侧的唯一性标记是 null，所以标识只可能来自精确计算
+  assert.equal(app.puzzle.unique, null);
+  assert.match(textOf(dom, 'stat-minsteps'), /^1 步 · 唯一解$/);
+
+  // 0110 → 目标 1：两个 0 格各点一次，先后顺序两种 → 多解
+  const multiBoard = Core.deserialize('0110', 2, 2);
+  const multiCode = Yicai.Share.encode({
+    rows: 2,
+    cols: 2,
+    target: 1,
+    limit: 2,
+    board: multiBoard,
+    solution: [
+      { index: 0, color: 1 },
+      { index: 3, color: 1 },
+    ],
+  });
+  click(dom, 'btn-import');
+  dom.document.getElementById('code-text').value = multiCode;
+  click(dom, 'code-confirm');
+  timers.run(80);
+  assert.equal(app.minSteps.status, 'done');
+  assert.equal(app.minSteps.exact, 2);
+  assert.equal(app.minSteps.optimalCount, 2, '最优解个数应为 2');
+  assert.match(textOf(dom, 'stat-minsteps'), /^2 步 · 多解$/);
+});
+
+test('app：确认唯一性期间也会显示进度，且答案已经先换成最短解', () => {
+  const { dom, app, Core, Yicai, timers } = boot();
+  const board = Core.deserialize('0011', 2, 2);
+  const code = Yicai.Share.encode({
+    rows: 2,
+    cols: 2,
+    target: 1,
+    limit: 2,
+    board,
+    solution: [
+      { index: 0, color: 2 },
+      { index: 0, color: 1 },
+    ],
+  });
+  click(dom, 'btn-import');
+  dom.document.getElementById('code-text').value = code;
+  click(dom, 'code-confirm');
+  const m = dom.document.getElementById('opt-minsteps');
+  m.checked = true;
+  m.dispatch('change', { target: m });
+  // 只推进一片：最短解已经找到并替换答案，唯一性可能还在确认
+  timers.run(6);
+  assert.ok(app.minSteps.exact != null || app.minSteps.status === 'done');
+  if (app.minSteps.exact != null) {
+    assert.equal(app.puzzle.solution.length, app.minSteps.exact, '一找到最短解就先换答案');
+  }
+  timers.run(80);
+  assert.equal(app.minSteps.status, 'done');
 });
 
 test('app：分享 → 导入可以原样还原题目', () => {

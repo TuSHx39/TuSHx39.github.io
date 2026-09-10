@@ -14,12 +14,17 @@
   const Solver = Yicai.Solver;
   const Store = Yicai.Store;
   const Share = Yicai.Share;
+  const MinSteps = Yicai.MinSteps;
 
   const MASK_ROWS = 10;
   const MASK_COLS = 10;
   /** 「步数 +1」的额外上限，防止无意义地一直加 */
   const EXTRA_CAP = 15;
   const DEMO_INTERVAL = 380;
+  /** 最短步数计算每一片最多占用的毫秒数（越小越不影响操作） */
+  const MINSTEPS_SLICE = 10;
+  /** 两片之间让出多少毫秒，避免一直占着主线程 */
+  const MINSTEPS_DELAY = 8;
 
   /** 自绘图形默认形状（心形） */
   const DEFAULT_PATTERN = [
@@ -51,6 +56,7 @@
       mask: defaultMask(),
       marks: false,
       preferUnique: false,
+      computeMinSteps: false,
     },
     draft: null,
     puzzle: null,
@@ -63,6 +69,7 @@
     hint: null,
     planMoves: null,
     codeMode: 'share',
+    minSteps: null,
     demo: null,
     busy: false,
     message: '',
@@ -76,6 +83,8 @@
   let hintTimer = 0;
   let paintValue = 1;
   let painting = false;
+  let minStepsJob = null;
+  let minStepsTimer = 0;
 
   // ------------------------------------------------------------------ 工具
 
@@ -123,6 +132,7 @@
       mask: Int8Array.from(s.mask || defaultMask()),
       marks: !!s.marks,
       preferUnique: !!s.preferUnique,
+      computeMinSteps: !!s.computeMinSteps,
     };
   }
 
@@ -214,6 +224,7 @@
     }
     render();
     persist();
+    restartMinSteps();
     return true;
   }
 
@@ -238,6 +249,7 @@
       target: state.settings.target,
       marks: !!state.settings.marks,
       preferUnique: !!state.settings.preferUnique,
+      computeMinSteps: !!state.settings.computeMinSteps,
       mask: maskToText(state.settings.mask),
     };
   }
@@ -252,6 +264,7 @@
     if (Core.isValidColor(snapshot.target)) s.target = snapshot.target;
     s.marks = !!snapshot.marks;
     s.preferUnique = !!snapshot.preferUnique;
+    s.computeMinSteps = !!snapshot.computeMinSteps;
     if (typeof snapshot.mask === 'string' && snapshot.mask.length === MASK_ROWS * MASK_COLS) {
       s.mask = textToMask(snapshot.mask, MASK_ROWS * MASK_COLS);
     }
@@ -269,6 +282,7 @@
       uniqueCount: state.puzzle.uniqueCount == null ? null : state.puzzle.uniqueCount,
       components: state.puzzle.components || 0,
       source: state.puzzle.source || '',
+      answerSource: state.puzzle.answerSource || '',
       mask: state.puzzle.mask ? maskToText(state.puzzle.mask) : '',
       cells: Core.serialize(state.puzzle.board),
       solution: (state.puzzle.solution || []).map((m) => [m.index, m.color]),
@@ -309,6 +323,7 @@
         uniqueCount: Number.isFinite(g.uniqueCount) ? g.uniqueCount : null,
         components: Number.isFinite(g.components) ? g.components : 0,
         source: typeof g.source === 'string' ? g.source : '',
+        answerSource: typeof g.answerSource === 'string' ? g.answerSource : '',
         board: initial,
         solution: Array.isArray(g.solution)
           ? g.solution
@@ -343,10 +358,205 @@
       domSignature = '';
       setMessage('已恢复上次的进度。');
       render();
+      restartMinSteps();
       return true;
     } catch (error) {
       return false;
     }
+  }
+
+  // ------------------------------------------------- 精确最短步数（后台计算）
+
+  function stopMinSteps(reason) {
+    if (minStepsTimer) {
+      clearTimeout(minStepsTimer);
+      minStepsTimer = 0;
+    }
+    if (minStepsJob) {
+      minStepsJob.stop();
+      minStepsJob = null;
+    }
+    if (state.minSteps && state.minSteps.status === 'running') {
+      state.minSteps = Object.assign({}, state.minSteps, { status: 'stopped', reason: reason || 'stopped' });
+    }
+  }
+
+  /** 换题时调用：清掉旧任务，按设置决定是否开新任务 */
+  function restartMinSteps() {
+    stopMinSteps('replaced');
+    state.minSteps = null;
+    if (!state.settings.computeMinSteps || !state.puzzle || state.puzzle.trivial) {
+      renderStats();
+      return;
+    }
+    if (!MinSteps) {
+      renderStats();
+      return;
+    }
+    minStepsJob = MinSteps.createJob(state.puzzle.board, state.puzzle.target, {
+      maxDepth: 40,
+      countOptimal: true, // 顺带数出「最优解有几个」，用来标唯一解 / 多解
+    });
+    state.minSteps = snapshotMinSteps(minStepsJob.state);
+    renderStats();
+    minStepsTimer = setTimeout(pumpMinSteps, 0);
+  }
+
+  function snapshotMinSteps(jobState) {
+    return {
+      status: jobState.status,
+      exact: jobState.exact,
+      lower: jobState.provenLower,
+      depth: jobState.depth,
+      nodes: jobState.nodes,
+      elapsed: jobState.elapsed,
+      optimalCount: jobState.optimalCount,
+    };
+  }
+
+  /** 每次只算一小片，让玩家可以边算边玩 */
+  function pumpMinSteps() {
+    minStepsTimer = 0;
+    if (!minStepsJob) return;
+    const running = minStepsJob.step(MINSTEPS_SLICE);
+    state.minSteps = snapshotMinSteps(minStepsJob.state);
+    if (state.minSteps.exact != null && !state.minSteps.adopted) {
+      // 最短解一找到就先换答案，之后继续确认唯一性不影响它
+      state.minSteps.adopted = true;
+      adoptOptimalSolution(minStepsJob.state.solution);
+    }
+    if (running) {
+      renderStats();
+      minStepsTimer = setTimeout(pumpMinSteps, MINSTEPS_DELAY);
+      return;
+    }
+    const finished = minStepsJob;
+    minStepsJob = null;
+    if (state.minSteps.status === 'done') {
+      state.minSteps.finishedAt = Date.now();
+      if (state.minSteps.optimalCount == null) ensureUniqueLabel();
+      adoptOptimalSolution(finished.state.solution);
+      persist();
+    }
+    // 收尾时整体重绘一次：提示文字可能也被换掉了
+    render();
+  }
+
+  function formatNodes(nodes) {
+    if (nodes >= 1e8) return (nodes / 1e8).toFixed(2) + ' 亿';
+    if (nodes >= 1e4) return (nodes / 1e4).toFixed(1) + ' 万';
+    return String(nodes);
+  }
+
+  /** 题目「唯一解 / 多解」的标识（出题时的判定，未验证时返回 null） */
+  function uniqueLabel() {
+    if (!state.puzzle) return null;
+    if (state.puzzle.unique === true) return '唯一解';
+    if (state.puzzle.unique === false) return '多解';
+    return null;
+  }
+
+  /**
+   * 精确计算给出的「最优解个数」更权威（它数的是最短步数的解有几个），有它就优先用；
+   * 没有才退回出题时的判定。两者都与「尽量出唯一解」开关无关。
+   */
+  function effectiveUniqueLabel() {
+    const info = state.minSteps;
+    if (info && info.status === 'done' && info.optimalCount != null) {
+      return info.optimalCount === 1 ? '唯一解' : '多解';
+    }
+    return uniqueLabel();
+  }
+
+  /** 已经算出的最短步数（还在确认唯一性也算；没开 / 没算到则返回 null） */
+  function exactMinSteps() {
+    return state.minSteps && state.minSteps.exact != null ? state.minSteps.exact : null;
+  }
+
+  function minStepsText() {
+    const info = state.minSteps;
+    if (!info) return '–';
+    if (info.status === 'done') {
+      // 算完就一并标出唯一解 / 多解（勾不勾「尽量出唯一解」都一样）
+      const label = effectiveUniqueLabel();
+      return info.exact + ' 步' + (label ? ' · ' + label : '');
+    }
+    if (info.status === 'stopped') {
+      if (info.exact != null) return '已停止 · 最短 ' + info.exact + ' 步（唯一性未验证）';
+      return '已停止 · 最少 ≥ ' + info.lower + ' 步';
+    }
+    if (info.exact != null) {
+      // 已经找到最短解，正在继续数「还有没有同样短的解」
+      return (
+        '最短 ' +
+        info.exact +
+        ' 步 · 正在确认唯一性… · ' +
+        formatNodes(info.nodes) +
+        ' 节点 · ' +
+        Math.round(info.elapsed) +
+        'ms'
+      );
+    }
+    return (
+      '计算中… 最少 ≥ ' +
+      info.lower +
+      ' 步 · ' +
+      formatNodes(info.nodes) +
+      ' 节点 · ' +
+      Math.round(info.elapsed) +
+      'ms'
+    );
+  }
+
+  /** 出题时的唯一性判定超时、且精确计算也没给出个数时，补一次（限制步数内的解的个数） */
+  function ensureUniqueLabel() {
+    const puzzle = state.puzzle;
+    if (!puzzle || puzzle.unique !== null || !Solver || !Solver.countOptimal) return;
+    const counted = Solver.countOptimal(puzzle.board, puzzle.target, puzzle.limit, {
+      timeMs: 250,
+      nodeLimit: 120000,
+      maxCount: 2,
+    });
+    if (!counted.timedOut) {
+      puzzle.uniqueCount = counted.count;
+      puzzle.unique = counted.count === 1;
+    }
+  }
+
+  /**
+   * 算出确切最短步数后：如果比现在的参考解更短，就把「答案」换成这条最短解。
+   * 限制步数不动（那是玩家正在用的游戏规则），只让提示 / 看答案给最优解。
+   */
+  function adoptOptimalSolution(moves) {
+    const puzzle = state.puzzle;
+    if (!puzzle || !moves || !moves.length) return false;
+    const current = puzzle.solution ? puzzle.solution.length : Infinity;
+    if (moves.length >= current) return false;
+    if (!Core.simulate(puzzle.board, moves, puzzle.target).solved) return false;
+    puzzle.solution = moves.map((move) => ({ index: move.index, color: move.color }));
+    puzzle.steps = puzzle.solution.length;
+    puzzle.answerSource = 'shortest';
+    clearHint();
+    setMessage('已算出确切最短步数 ' + moves.length + ' 步，参考答案也换成了这条最短解。', 'good');
+    return true;
+  }
+
+  function renderMinSteps() {
+    const enabled = !!state.settings.computeMinSteps && !!state.puzzle && !state.puzzle.trivial;
+    els.statMinWrap.hidden = !enabled;
+    if (!enabled) {
+      // 关掉之后要彻底清干净，别留着最后一次的结果
+      els.statMinSteps.textContent = '';
+      els.statMinSteps.classList.remove('computing', 'unique');
+      els.statMinSteps.title = '';
+      return;
+    }
+    const info = state.minSteps;
+    els.statMinSteps.textContent = minStepsText();
+    els.statMinSteps.classList.toggle('computing', !!info && info.status === 'running');
+    els.statMinSteps.classList.toggle('unique', !!info && info.status === 'done');
+    els.statMinSteps.title =
+      info && info.status === 'running' ? '正在精确穷举，点一下可以停止计算' : '点一下可以重新开始计算';
   }
 
   // ------------------------------------------------------------------ 渲染
@@ -433,12 +643,22 @@
     els.statTarget.style.background = colorHex(target);
     els.statTarget.textContent = colorName(target);
 
-    let text = '参考解 ' + (puzzle ? puzzle.limit : 0) + ' 步';
-    if (puzzle && puzzle.unique === true) text += ' · 唯一解';
-    else if (puzzle && puzzle.unique === false) text += ' · 多解';
-    if (puzzle && puzzle.cap && puzzle.cap > puzzle.limit) text += ' · 上限 ' + puzzle.cap + ' 步';
-    els.statDifficulty.textContent = text;
+    // 「本题」这一栏的排布：
+    //   · 没开强制计算：上限 M 步 · 参考解 N 步 · 唯一解/多解（唯一解标识放最右）
+    //   · 开了强制计算：算之前显示「上限 + 参考解」；算出确切最短步数后
+    //     参考解隐去，步数只由右边那栏「最短步数」负责
+    const cap = puzzle ? puzzle.cap || puzzle.limit : 0;
+    const parts = ['上限 ' + cap + ' 步'];
+    if (!state.settings.computeMinSteps || exactMinSteps() == null) {
+      parts.push('参考解 ' + (puzzle ? puzzle.limit : 0) + ' 步');
+    }
+    if (!state.settings.computeMinSteps) {
+      const label = uniqueLabel();
+      if (label) parts.push(label);
+    }
+    els.statDifficulty.textContent = parts.join(' · ');
     els.statDifficulty.classList.toggle('unique', !!(puzzle && puzzle.unique === true));
+    renderMinSteps();
   }
 
   function renderSlots() {
@@ -860,7 +1080,9 @@
 
     const sourceText =
       plan.source === 'builtin'
-        ? '出题时的参考解'
+        ? state.puzzle && state.puzzle.answerSource === 'shortest'
+          ? '精确计算得到的最短解'
+          : '出题时的参考解'
         : plan.source === 'shortest'
           ? '搜索得到的最短解'
           : plan.source === 'improved'
@@ -1111,6 +1333,7 @@
       source: 'import',
       unique: null,
       uniqueCount: null,
+      answerSource: 'import',
       trivial: solution.length === 0,
     };
     state.board = Core2.cloneBoard(data.board);
@@ -1134,6 +1357,7 @@
     setMessage('已导入题目：参考解 ' + solution.length + ' 步，限制 ' + limit + ' 步。');
     render();
     persist();
+    restartMinSteps();
   }
 
   function confirmImport() {
@@ -1170,6 +1394,7 @@
     els.optLimitOut.textContent = d.limit + ' 步';
     els.optMarks.checked = !!d.marks;
     els.optUnique.checked = !!d.preferUnique;
+    els.optMinSteps.checked = !!d.computeMinSteps;
     for (const chip of els.optTargetChips.children) {
       const index = Number(chip.dataset.color);
       chip.classList.toggle('selected', index === d.target);
@@ -1213,6 +1438,7 @@
     els.optLimitOut = byId('opt-limit-out');
     els.optMarks = byId('opt-marks');
     els.optUnique = byId('opt-unique');
+    els.optMinSteps = byId('opt-minsteps');
     els.optTargetChips = byId('opt-target-chips');
     els.maskGrid = byId('mask-grid');
     els.maskInfo = byId('mask-info');
@@ -1345,6 +1571,20 @@
     els.btnDemoAll.addEventListener('click', demoAll);
     els.btnDemoStop.addEventListener('click', () => stopDemo());
 
+    els.statMinWrap.addEventListener('click', () => {
+      if (!state.settings.computeMinSteps || !state.puzzle || state.puzzle.trivial) return;
+      if (state.minSteps && state.minSteps.status === 'running') {
+        const lower = state.minSteps.lower;
+        stopMinSteps('stopped');
+        renderStats();
+        setMessage('已停止计算最短步数（目前只证明了最少 ≥ ' + lower + ' 步）。');
+      } else {
+        restartMinSteps();
+        setMessage('重新开始精确计算最短步数…（可以边玩边算）');
+      }
+      renderMessage();
+    });
+
     els.answerDemo.addEventListener('click', startDemo);
     els.answerClose.addEventListener('click', () => closeModal(els.answerModal));
 
@@ -1407,6 +1647,18 @@
       if (!state.draft) return;
       state.draft.preferUnique = els.optUnique.checked;
     });
+    els.optMinSteps.addEventListener('change', () => {
+      const on = els.optMinSteps.checked;
+      if (state.draft) state.draft.computeMinSteps = on;
+      // 「强制计算」是显示/计算开关，立刻生效，不用重新出题
+      state.settings.computeMinSteps = on;
+      if (!on) {
+        stopMinSteps('disabled');
+        state.minSteps = null;
+      }
+      restartMinSteps();
+      persist();
+    });
     els.optApply.addEventListener('click', () => {
       if (!state.draft) return;
       state.settings = cloneSettings(state.draft);
@@ -1460,6 +1712,8 @@
       statUsed: byId('stat-used'),
       statTarget: byId('stat-target'),
       statDifficulty: byId('stat-difficulty'),
+      statMinWrap: byId('stat-min-wrap'),
+      statMinSteps: byId('stat-minsteps'),
       banner: byId('banner'),
       bannerTitle: byId('banner-title'),
       bannerText: byId('banner-text'),

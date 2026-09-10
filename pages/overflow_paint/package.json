@@ -4,6 +4,6 @@
   "description": "溢彩画：逆向出题的染色小游戏（核心逻辑 / 出题器 / 求解器 / 交互层的纯 Node 测试）",
   "scripts": {
     "test": "node --test tests",
-    "test:single": "node --test --test-isolation=none tests/core.test.mjs tests/generator.test.mjs tests/solver.test.mjs tests/share.test.mjs tests/app.test.mjs"
+    "test:single": "node --test --test-isolation=none tests/core.test.mjs tests/generator.test.mjs tests/solver.test.mjs tests/share.test.mjs tests/minsteps.test.mjs tests/app.test.mjs"
   }
 }

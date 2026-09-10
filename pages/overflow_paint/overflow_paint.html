@@ -42,6 +42,10 @@
           <span class="stat-label">本题</span>
           <span class="difficulty" id="stat-difficulty">–</span>
         </div>
+        <div class="stat" id="stat-min-wrap" hidden>
+          <span class="stat-label">最短步数</span>
+          <span class="difficulty" id="stat-minsteps" title="点一下可以停止计算">–</span>
+        </div>
       </div>
 
       <div class="board-wrap" id="board-wrap">
@@ -69,6 +73,14 @@
 
       <section class="panel">
         <h2 class="panel-title">操作</h2>
+        <div class="demo-controls" id="demo-controls" hidden>
+          <p class="tiny" id="demo-progress">演示：0 / 0</p>
+          <div class="actions three">
+            <button type="button" id="btn-demo-next">下一步</button>
+            <button type="button" id="btn-demo-all">完整演示</button>
+            <button type="button" id="btn-demo-stop">结束演示</button>
+          </div>
+        </div>
         <div class="actions">
           <button type="button" id="btn-hint" title="提示下一步（H）">提示</button>
           <button type="button" id="btn-answer" title="查看从当前局面出发的参考解">看答案</button>
@@ -82,14 +94,6 @@
           <button type="button" id="btn-import" title="用分享码载入一道题目">导入</button>
           <button type="button" id="btn-options" class="primary wide" title="自定义棋盘形状、尺寸、步数与目标色">自定义选项</button>
         </div>
-        <div class="demo-controls" id="demo-controls" hidden>
-          <p class="tiny" id="demo-progress">演示：0 / 0</p>
-          <div class="actions three">
-            <button type="button" id="btn-demo-next">下一步</button>
-            <button type="button" id="btn-demo-all">完整演示</button>
-            <button type="button" id="btn-demo-stop">结束演示</button>
-          </div>
-        </div>
       </section>
 
       <section class="panel">
@@ -99,6 +103,7 @@
           <li>题目由随机拼块生成，出题时会把<strong>限制步数收紧到题目的实际难度</strong></li>
           <li>题目参考解一定存在；卡住了就用<strong>提示 </strong>。</li>
           <li>勾选「尽量出唯一解」可以让小棋盘出到已校验的唯一解题，棋盘越大越难成功。</li>
+          <li>勾选「强制计算最短步数」会用精确穷举算出<strong>真正的最短步数</strong>，算的时候可以正常游玩，点击状态栏最短步数项即可终止计算。</li>
         </ul>
       </section>
 
@@ -161,6 +166,11 @@
       </label>
 
       <label class="check">
+        <input type="checkbox" id="opt-minsteps">
+        <span>强制计算最短步数（精确穷举，<b>计算时照常可以玩</b>，小棋盘很快、大棋盘可能算很久）</span>
+      </label>
+
+      <label class="check">
         <input type="checkbox" id="opt-marks">
         <span>色盲辅助标记（在每个格子上显示图形符号）</span>
       </label>
@@ -214,6 +224,7 @@
 <script src="js/core.js"></script>
 <script src="js/generator.js"></script>
 <script src="js/solver.js"></script>
+<script src="js/minsteps.js"></script>
 <script src="js/share.js"></script>
 <script src="js/store.js"></script>
 <script src="js/app.js"></script>

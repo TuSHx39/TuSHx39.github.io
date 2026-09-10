@@ -18,6 +18,15 @@
   box-sizing: border-box;
 }
 
+/*
+ * 带 hidden 的元素一律不显示。
+ * 必须显式写这条：作者样式里的 display（比如 .stat 的 flex）会盖掉浏览器默认的
+ * [hidden] { display: none }，只加 hidden 属性是藏不住的。
+ */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -175,6 +184,17 @@ button {
   color: var(--accent);
   background: var(--accent-soft);
   font-weight: 600;
+}
+
+.difficulty.computing {
+  border-color: #d9a406;
+  color: var(--warn);
+  background: rgba(217, 164, 6, 0.12);
+}
+
+.difficulty.unique,
+.difficulty.computing {
+  cursor: pointer;
 }
 
 /* ------------------------------------------------------------------ 棋盘 */
@@ -525,9 +545,10 @@ button.wide {
 }
 
 .demo-controls {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--line);
+  /* 演示控件现在放在操作按钮上方 */
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
 }
 
 .demo-controls[hidden] {
