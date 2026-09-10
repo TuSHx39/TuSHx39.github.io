@@ -1215,45 +1215,57 @@ test('五线谱：真实音高落位正确，超出谱表画加线', () => {
   clearStaff();
 });
 
-test('五线谱：符头一律错开——线上偏左、线间偏右，不存在居中', () => {
+test('五线谱：只有二度相邻的音才左右错开，其余一律居中', () => {
   resetAll();
   clearStaff();
 
-  // 单音：符头落在列中心左侧或右侧，绝不居中，且离谱号有距离
-  press(1, 64);                       // E4：最下面那条线（音级 30，偶数 = 线上 → 偏左）
-  let heads = collectByClass(appStaff().svg, 'note-head');
-  assert.equal(heads.length, 1);
   const columnX = 104;                // 与 staff.js 的 COLUMN_X 一致
-  const e4x = Number.parseFloat(heads[0].getAttribute('cx'));
-  assert.ok(e4x < columnX, `线上的音应偏左（cx=${e4x}）`);
-  assert.ok(e4x >= 80, `符头要离高音谱号远一点（cx=${e4x}）`);
-  releaseAll();
-
-  // C 大三和弦：C4/E4/G4 音级 28/30/32 全是偶数（都在线上）→ 三个符头同一边
-  clearStaff();
-  press(1, 60);
-  press(2, 64);
-  press(3, 67);
-  let xs = collectByClass(appStaff().svg, 'note-head')
-    .map(head => Number.parseFloat(head.getAttribute('cx')));
-  assert.equal(new Set(xs.map(x => Math.round(x))).size, 1, '都在线上的音用同一边');
-  assert.ok(xs[0] < columnX, '线上的音偏左');
-  releaseAll();
-
-  // C4 + D4：音级 28（线上）与 29（线间）→ 一个偏左一个偏右，正好相切
-  clearStaff();
-  press(1, 60);
-  press(2, 62);
-  heads = collectByClass(appStaff().svg, 'note-head')
+  const xsOf = () => collectByClass(appStaff().svg, 'note-head')
     .map(head => ({
       cx: Number.parseFloat(head.getAttribute('cx')),
       cy: Number.parseFloat(head.getAttribute('cy')),
+      rx: Number.parseFloat(head.getAttribute('rx')),
     }))
-    .sort((a, b) => b.cy - a.cy);    // cy 越大音越低
+    .sort((a, b) => b.cy - a.cy);     // cy 越大音越低
+
+  // 单音：居中
+  press(1, 64);                       // E4（最下面那条线）
+  let heads = xsOf();
+  assert.equal(heads[0].cx, columnX, '单音居中');
+  assert.ok(columnX >= 100, `符头要离高音谱号远一点（cx=${columnX}）`);
+  releaseAll();
+
+  // 线上 + 线间但不相邻（C4 = 28 与 F4 = 31）：都居中，不互相让位
+  clearStaff();
+  press(1, 60);
+  press(2, 65);
+  heads = xsOf();
   assert.equal(heads.length, 2);
-  assert.ok(heads[0].cx < columnX, '低音 C4 在线上 → 偏左');
-  assert.ok(heads[1].cx > columnX, '高音 D4 在线间 → 偏右');
-  assert.ok(heads[1].cx - heads[0].cx >= 18, '左右错开的距离要够（符头相切）');
+  assert.equal(heads[0].cx, columnX, '不相邻时不做左右偏移');
+  assert.equal(heads[1].cx, columnX, '不相邻时不做左右偏移');
+  releaseAll();
+
+  // 真正构成二度（C4 = 28 与 D4 = 29）：一左一右，且挨得比较近
+  clearStaff();
+  press(1, 60);
+  press(2, 62);
+  heads = xsOf();
+  assert.ok(heads[0].cx < columnX, '线上（C4）偏左');
+  assert.ok(heads[1].cx > columnX, '线间（D4）偏右');
+  const gap = heads[1].cx - heads[0].cx;
+  const headWidth = heads[0].rx * 2;
+  assert.ok(gap >= headWidth * 0.6, `不能挤在一起（间距 ${gap}）`);
+  assert.ok(gap < headWidth, `应该靠得比相切更近（间距 ${gap}，符头宽 ${headWidth}）`);
+  releaseAll();
+
+  // 连续二度（C4 D4 E4）：每个音都参与二度，全部错开、左右交替
+  clearStaff();
+  press(1, 60);
+  press(2, 62);
+  press(3, 64);
+  const sides = xsOf().map(head => Math.round(head.cx));
+  assert.ok(sides.every(cx => cx !== columnX), '都参与二度时没有居中');
+  assert.equal(new Set(sides).size, 2, '只用左右两侧');
 
   releaseAll();
   clearStaff();

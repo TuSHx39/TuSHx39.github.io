@@ -1,19 +1,3 @@
-/**
- * staff.js —— 五线谱（单谱表，高音谱号，只显示一个柱式和弦）
- *
- * 记谱规则：
- *   · 谱面上永远只有一个柱式和弦（一列），宽度只留得下一个音符加余量；
- *   · 音符画成**实心符头、不画符干**，符头大小约等于线距；
- *   · 符头一律左右错开（没有居中这回事）：**谱线上的音偏左、谱线之间的音偏右**，
- *     于是二度相邻的两个符头必然一左一右、不会叠在一起；
- *   · 踩住踏板期间弹的所有音都并进这一列，穿成一串（柱式和弦）；
- *   · 没踩踏板时，与「这一列里还按着的音」重叠、或距上一笔极短（< 100ms）的音也并进同一列；
- *   · **松开踏板 = 这一段结束，立刻清空整个谱面**；没踩踏板时，下一次演奏（新的一笔）也会替换掉旧的一列；
- *   · 每个音按真实音高落位，超出谱表画加线（最多 7 条，再远的做钳制）；
- *   · 升降号：优先用键盘映射带来的拼写，否则按这一列和弦的音程关系决定（与读数同一套规则）。
- *
- * 传统脚本（非 ES Module），接口挂在全局 Piano.Staff 上。
- */
 
 (function (global) {
   'use strict';
@@ -33,8 +17,8 @@ const STAFF_TOP_Y = (SHEET_HEIGHT - STAFF_HEIGHT) / 2;
 const STAFF_BOTTOM_Y = STAFF_TOP_Y + STAFF_HEIGHT;
 const COLUMN_X = 104;                   // 唯一那一列的水平位置（离谱号远一点）
 const HEAD_RX = SPACE * 0.62;           // 符头半宽（约一个线距宽）
-const HEAD_RY = SPACE * 0.46;           // 符头半高
-const HEAD_SHIFT = HEAD_RX;             // 左右错开的距离：二度相邻时正好相切
+const HEAD_RY = SPACE * 0.5;           // 符头半高
+const HEAD_SHIFT = HEAD_RX * 0.75;      // 左右错开的距离：二度相邻时符头略微重叠（和真实谱子一样）
 const LINE_STEP_PARITY = 0;             // 谱表音级为偶数 = 落在线上（E4 = 30 是最下面那条线）
 const JOIN_WINDOW_MS = 100;             // 与上一笔间隔小于这个值算同一柱
 const MAX_LEDGERS = 7;                  // 加线上限（约 E2–F7）
@@ -190,21 +174,40 @@ function createStaff(config = {}) {
     }
   }
 
-  /** 画这一列：加线 → 升降号 → 符头 → 符干 */
+  /** 画这一列：加线 → 升降号 → 符头 */
   function render() {
     clearGroup();
     const laid = notes
       .map(note => layoutNote(note, spellingOf()))
-      .sort((a, b) => a.step - b.step);
+      .sort((a, b) => (a.step - b.step) || (a.midi - b.midi));
     if (!laid.length) return;
 
-    // 符头一律左右错开，没有「居中」这一档：
-    // 落在谱线上的音偏左，落在谱线之间的音偏右。
-    // 音级相邻（二度）必然一个在线上、一个在线间，所以符头自然一左一右，正好相切。
-    for (const note of laid) {
-      note.side = note.step % 2 === LINE_STEP_PARITY ? -1 : 1;
-      note.x = COLUMN_X + note.side * HEAD_SHIFT;
+    // 左右错开只在「真正构成二度」时发生：也就是某个音与相邻的音只差一个音级
+    // （一个在线上、一个在线间）。其余的音一律居中 —— 即使这一列里既有线上的音
+    // 也有线间的音，只要它们彼此不相邻，就不需要让位。
+    for (let i = 0; i < laid.length; i++) {
+      const note = laid[i];
+      const previous = laid[i - 1];
+      const next = laid[i + 1];
+      const touchesPrevious = Boolean(previous) && note.step - previous.step <= 1;
+      const touchesNext = Boolean(next) && next.step - note.step <= 1;
+      note.split = touchesPrevious || touchesNext;
+      note.side = 0;
     }
+    for (let i = 0; i < laid.length; i++) {
+      const note = laid[i];
+      if (!note.split) continue;
+      const previous = laid[i - 1];
+      if (previous && previous.split && previous.step === note.step) {
+        // 同一个位置上的两个音（例如 C 与 C#）：低音在左、高音在右
+        note.side = 1;
+        previous.side = -1;
+      } else {
+        note.side = note.step % 2 === LINE_STEP_PARITY ? -1 : 1;   // 线上偏左、线间偏右
+      }
+    }
+    // 位置要等左右全部定完再算
+    for (const note of laid) note.x = COLUMN_X + note.side * HEAD_SHIFT;
 
     const group = svgEl('g', { class: 'staff-column' });
 
@@ -236,7 +239,7 @@ function createStaff(config = {}) {
       group.appendChild(text);
     }
 
-    // 符头：二分音符的样子（空心、无符干），大小约等于线距
+    // 符头：实心、只有头（无符干），大小约等于线距
     for (const note of laid) {
       group.appendChild(svgEl('ellipse', {
         class: 'note-head',
