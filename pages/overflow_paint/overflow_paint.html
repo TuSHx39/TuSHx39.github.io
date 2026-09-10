@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="description" content="溢彩画：把相连的同色色块染成指定颜色，用有限步数让整幅图变成同一种颜色。支持自定义图形、随机出题、分享。" />
+  <title>溢彩画</title>
+
+  <link rel="icon" type="image/x-icon" href="../../assets/images/favicon.png">
+  <link rel="stylesheet" href="overflow_paint.css">
+</head>
+
+<body>
+
+<div class="page">
+
+  <header class="topbar">
+    <div class="title-block">
+      <h1>溢彩画</h1>
+      <p class="subtitle">点击一块同色区域染成所选颜色，在限制步数内把整幅图染成目标色。 ps:灵感来自鸣潮溢彩画</p>
+    </div>
+    <a class="back-link" href="../../index.html">← 返回主页</a>
+  </header>
+
+  <main class="layout">
+
+    <section class="panel board-panel">
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">剩余步数</span>
+          <strong class="stat-value" id="stat-left">–</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label">已用</span>
+          <strong class="stat-value" id="stat-used">0 / 0</strong>
+        </div>
+        <div class="stat">
+          <span class="stat-label">目标颜色</span>
+          <span class="chip-target" id="stat-target"></span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">本题</span>
+          <span class="difficulty" id="stat-difficulty">–</span>
+        </div>
+      </div>
+
+      <div class="board-wrap" id="board-wrap">
+        <div class="board" id="board" role="grid" aria-label="溢彩画棋盘"></div>
+        <div class="banner" id="banner" hidden>
+          <div class="banner-card">
+            <h2 id="banner-title"></h2>
+            <p id="banner-text"></p>
+            <div class="banner-actions" id="banner-actions"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slots" id="slots" aria-hidden="true"></div>
+      <p class="message info" id="message">正在准备棋盘…</p>
+    </section>
+
+    <aside class="side">
+
+      <section class="panel">
+        <h2 class="panel-title">调色盘</h2>
+        <div class="palette" id="palette"></div>
+        <p class="tiny">选一种颜色，再点棋盘上的色块；数字键也能选色。</p>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">操作</h2>
+        <div class="actions">
+          <button type="button" id="btn-hint" title="提示下一步（H）">提示</button>
+          <button type="button" id="btn-answer" title="查看从当前局面出发的参考解">看答案</button>
+          <button type="button" id="btn-plus" title="把限制步数 +1">步数 +1</button>
+          <button type="button" id="btn-undo" title="撤销上一步（U）">撤销</button>
+        </div>
+        <div class="actions">
+          <button type="button" id="btn-restart" title="回到本题初始局面（R）">重开本题</button>
+          <button type="button" id="btn-new" title="按当前设置随机出一题">随机新题</button>
+          <button type="button" id="btn-share" title="把当前题目保存成一串分享码">分享</button>
+          <button type="button" id="btn-import" title="用分享码载入一道题目">导入</button>
+          <button type="button" id="btn-options" class="primary wide" title="自定义棋盘形状、尺寸、步数与目标色">自定义选项</button>
+        </div>
+        <div class="demo-controls" id="demo-controls" hidden>
+          <p class="tiny" id="demo-progress">演示：0 / 0</p>
+          <div class="actions three">
+            <button type="button" id="btn-demo-next">下一步</button>
+            <button type="button" id="btn-demo-all">完整演示</button>
+            <button type="button" id="btn-demo-stop">结束演示</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-title">玩法</h2>
+        <ul class="tips">
+          <li>一次操作会染色<strong>整块相连的同色区域</strong>。</li>
+          <li>题目由随机拼块生成，出题时会把<strong>限制步数收紧到题目的实际难度</strong></li>
+          <li>题目参考解一定存在；卡住了就用<strong>提示 </strong>。</li>
+          <li>勾选「尽量出唯一解」可以让小棋盘出到已校验的唯一解题，棋盘越大越难成功。</li>
+        </ul>
+      </section>
+
+    </aside>
+
+  </main>
+</div>
+
+<!-- 自定义选项 -->
+<div class="modal" id="options-modal" hidden>
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2>自定义选项</h2>
+      <button type="button" class="icon-btn" id="opt-close" aria-label="关闭">×</button>
+    </header>
+
+    <div class="modal-body">
+
+      <div class="tabs">
+        <button type="button" class="tab active" data-mode="rect">矩形棋盘</button>
+        <button type="button" class="tab" data-mode="mask">自绘图形（10×10）</button>
+      </div>
+
+      <section class="pane" id="pane-rect">
+        <div class="field-row">
+          <label class="field">
+            <span>列数（1–20）</span>
+            <input type="number" id="opt-cols" min="1" max="20" step="1" value="10">
+          </label>
+          <label class="field">
+            <span>行数（1–15）</span>
+            <input type="number" id="opt-rows" min="1" max="15" step="1" value="8">
+          </label>
+        </div>
+        <p class="tiny">常用尺寸：10×8、12×10、15×10、20×15 都行，最多 20 列 15 行。</p>
+      </section>
+
+      <section class="pane" id="pane-mask" hidden>
+        <div class="mask-editor" id="mask-grid" aria-label="10×10 图形绘制区"></div>
+        <div class="mask-presets" id="mask-presets"></div>
+        <p class="tiny" id="mask-info"></p>
+      </section>
+
+      <div class="field-row">
+        <label class="field grow">
+          <span>限制步数上限（1–15，出题时会收紧到题目的实际难度）</span>
+          <input type="range" id="opt-limit" min="1" max="15" step="1" value="8">
+        </label>
+        <output class="limit-out" id="opt-limit-out">8 步</output>
+      </div>
+
+      <div class="field">
+        <span>目标颜色</span>
+        <div class="chips" id="opt-target-chips"></div>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="opt-unique">
+        <span>尽量出「唯一解」的题目（棋盘小、步数少时更容易成功，出题会慢一点）</span>
+      </label>
+
+      <label class="check">
+        <input type="checkbox" id="opt-marks">
+        <span>色盲辅助标记（在每个格子上显示图形符号）</span>
+      </label>
+
+    </div>
+
+    <footer class="modal-foot">
+      <button type="button" id="opt-cancel">取消</button>
+      <button type="button" class="primary" id="opt-apply">按此设置生成新题</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 参考答案 -->
+<div class="modal" id="answer-modal" hidden>
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2>参考答案</h2>
+      <button type="button" class="icon-btn" id="answer-close" aria-label="关闭">×</button>
+    </header>
+    <div class="modal-body">
+      <p class="tiny" id="answer-summary"></p>
+      <p class="tiny" id="answer-empty" hidden>当前局面没有需要再染的色块。</p>
+      <ol class="answer-list" id="answer-list"></ol>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" class="primary" id="answer-demo">在棋盘上演示</button>
+    </footer>
+  </div>
+</div>
+
+<!-- 分享 / 导入 -->
+<div class="modal" id="code-modal" hidden>
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 id="code-title">分享题目</h2>
+      <button type="button" class="icon-btn" id="code-close" aria-label="关闭">×</button>
+    </header>
+    <div class="modal-body">
+      <p class="tiny" id="code-hint"></p>
+      <textarea id="code-text" class="code-text" spellcheck="false" rows="4"></textarea>
+      <p class="tiny warn" id="code-error" hidden></p>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" id="code-cancel">关闭</button>
+      <button type="button" class="primary" id="code-confirm">复制</button>
+    </footer>
+  </div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/solver.js"></script>
+<script src="js/share.js"></script>
+<script src="js/store.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
