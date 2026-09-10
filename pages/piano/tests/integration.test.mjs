@@ -56,19 +56,47 @@ class FakeClassList {
 }
 
 class FakeElement {
-  constructor(tagName) {
+  constructor(tagName, ownerDocument = null) {
     this.tagName = String(tagName).toUpperCase();
+    this.ownerDocument = ownerDocument;
     this.children = [];
     this.parentElement = null;
     this.classList = new FakeClassList();
     this.dataset = {};
     this.style = {};
+    this.attributes = {};
     this.listeners = new Map();
     this.textContent = '';
     this.checked = false;
     this.value = '';
     this.isFragment = false;
     this.left = 0;
+  }
+
+  /* —— SVG 用得到的属性接口 —— */
+
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+  }
+
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name)
+      ? this.attributes[name]
+      : null;
+  }
+
+  removeChild(child) {
+    const index = this.children.indexOf(child);
+    if (index >= 0) {
+      this.children.splice(index, 1);
+      child.parentElement = null;
+    }
+    return child;
+  }
+
+  replaceChildren(...nodes) {
+    for (const child of [...this.children]) this.removeChild(child);
+    for (const node of nodes) this.appendChild(node);
   }
 
   get className() {
@@ -348,7 +376,10 @@ function createEnvironment() {
     readyState: 'complete',
     body: track(new FakeElement('body')),
     createElement(tagName) {
-      return new FakeElement(tagName);
+      return new FakeElement(tagName, document);
+    },
+    createElementNS(namespace, tagName) {
+      return new FakeElement(tagName, document);
     },
     createDocumentFragment() {
       const fragment = new FakeElement('#fragment');
@@ -582,11 +613,13 @@ test('按下三和弦：发声、音名与和弦读数同步', () => {
   const context = FakeAudioContext.instances.at(-1);
   assert.equal(context.oscillators.length, 3, '应创建三个振荡器');
   assert.equal(el('current-note').textContent, '当前音: C4 , E4 , G4');
-  assert.equal(chordText(), '当前和弦：C');
+  assert.equal(chordText(), 'C');
+  assert.ok(!el('chord-side').classList.contains('is-empty'), '有和弦时区域正常显示');
   assert.ok(el('current-chord-alt').classList.contains('is-hidden'), '只有一个读法时不显示候选');
 
   releaseAll();
-  assert.equal(chordText(), '当前和弦：-');
+  assert.equal(chordText(), '', '没有和弦时不显示任何符号（连 - 也不显示）');
+  assert.ok(el('chord-side').classList.contains('is-empty'), '和弦区域整块留空');
   assert.equal(el('current-note').textContent, '当前音: -');
 });
 
@@ -597,7 +630,7 @@ test('同一组音给出多个读法时显示候选', () => {
   press(3, 67);
   press(4, 69);
 
-  assert.equal(chordText(), '当前和弦：C6');
+  assert.equal(chordText(), 'C6');
   assert.ok(!el('current-chord-alt').classList.contains('is-hidden'));
   assert.match(el('current-chord-alt').textContent, /Am7\/C/);
 
@@ -615,11 +648,11 @@ test('踏板：按住空格延音，松开停音', () => {
 
   releaseAll();
   // 松键但踏板仍踩着：声音与读数都保留
-  assert.equal(chordText(), '当前和弦：C', '延音期间和弦读数不应消失');
+  assert.equal(chordText(), 'C', '延音期间和弦读数不应消失');
 
   releaseSpace();
   assert.ok(!sustainVisible(), '松开踏板后延音结束');
-  assert.equal(chordText(), '当前和弦：-', '抬起踏板后延音音符立即停止');
+  assert.equal(chordText(), '', '抬起踏板后延音音符立即停止');
 });
 
 test('踏板切换模式：踩一次保持，再踩一次放开', () => {
@@ -675,7 +708,7 @@ test('低音 + 上层三和弦只按八度内解读（没有复合和弦模式�
 
   // 最低音 D 本身就是和弦音，优先按 D 当根音读作 D9sus4；
   // 把 C 当根音的读法（Cadd9/D）留在候选里 —— 不会再出现 C/D 这种复合读法。
-  assert.equal(chordText(), '当前和弦：D9sus4');
+  assert.equal(chordText(), 'D9sus4');
   assert.match(el('current-chord-alt').textContent, /Cadd9\/D/);
   assert.ok(!/C\/D/.test(el('current-chord-alt').textContent), '不应再有复合读法');
 
@@ -687,15 +720,15 @@ test('转位开关：关闭后只认原位', () => {
   press(1, 64);
   press(2, 67);
   press(3, 72);
-  assert.equal(chordText(), '当前和弦：C/E');
+  assert.equal(chordText(), 'C/E');
 
   el('inversion-toggle').checked = false;
   el('inversion-toggle').dispatchEvent('change');
-  assert.equal(chordText(), '当前和弦：-');
+  assert.equal(chordText(), '');
 
   el('inversion-toggle').checked = true;
   el('inversion-toggle').dispatchEvent('change');
-  assert.equal(chordText(), '当前和弦：C/E');
+  assert.equal(chordText(), 'C/E');
 
   releaseAll();
 });
@@ -717,12 +750,13 @@ test('识别和弦开关会收起次级设置（只剩转位开关）', () => {
   resetAll();
   el('chord-toggle').checked = false;
   el('chord-toggle').dispatchEvent('change');
-  assert.ok(el('current-chord').classList.contains('is-hidden'));
+  assert.ok(el('chord-side').classList.contains('is-hidden'), '和弦符号与标注一起收起');
   assert.ok(!el('inversion-setting').classList.contains('show'));
 
   el('chord-toggle').checked = true;
   el('chord-toggle').dispatchEvent('change');
   assert.ok(el('inversion-setting').classList.contains('show'));
+  assert.ok(!el('chord-side').classList.contains('is-hidden'));
 });
 
 test('显示踏板开关会把底栏与读数一起收起', () => {
@@ -796,12 +830,12 @@ test('单音（含同音八度）不显示和弦', () => {
   resetAll();
   press(1, 60);
   assert.equal(el('current-note').textContent, '当前音: C4');
-  assert.equal(chordText(), '当前和弦：-', '单音不应给出和弦读法');
+  assert.equal(chordText(), '', '单音不应给出和弦读法');
 
   // 再叠一个同音八度，仍然只有一个音级 → 依然不算和弦
   press(2, 72);
   assert.equal(el('current-note').textContent, '当前音: C4 , C5');
-  assert.equal(chordText(), '当前和弦：-');
+  assert.equal(chordText(), '');
 
   releaseAll();
 });
@@ -890,9 +924,9 @@ test('踏板踩下时松开的音：一直算正在弹奏，抬踏板才清除',
   press(3, 67);
   releaseAll();          // 松键，但踏板还踩着
 
-  assert.equal(chordText(), '当前和弦：C', '踏板保持期间和弦读数应保留');
+  assert.equal(chordText(), 'C', '踏板保持期间和弦读数应保留');
   advanceTime(30);       // 即使已经衰减到极小
-  assert.equal(chordText(), '当前和弦：C', '衰减到极小也算正在弹奏，直到抬踏板');
+  assert.equal(chordText(), 'C', '衰减到极小也算正在弹奏，直到抬踏板');
 
   releaseSpace();
   assert.equal(el('current-note').textContent, '当前音: -');
@@ -933,7 +967,7 @@ test('升降号：单音默认升号，和弦按音程关系，键盘映射按�
   press(2, 63);
   press(3, 67);
   assert.equal(el('current-note').textContent, '当前音: C4 , Eb4 , G4');
-  assert.equal(chordText(), '当前和弦：Cm');
+  assert.equal(chordText(), 'Cm');
   releaseAll();
 
   // C# 小三和弦：C#m 习惯用升号
@@ -941,7 +975,7 @@ test('升降号：单音默认升号，和弦按音程关系，键盘映射按�
   press(2, 64);
   press(3, 68);
   assert.equal(el('current-note').textContent, '当前音: C#4 , E4 , G#4');
-  assert.equal(chordText(), '当前和弦：C#m');
+  assert.equal(chordText(), 'C#m');
   releaseAll();
 });
 
@@ -989,7 +1023,7 @@ test('电脑键盘映射：从数字排开始读，E 落在 C3', () => {
   computerKey('KeyE', 'keydown');
   computerKey('KeyT', 'keydown');
   computerKey('KeyU', 'keydown');
-  assert.equal(chordText(), '当前和弦：C');
+  assert.equal(chordText(), 'C');
   computerKey('KeyE', 'keyup');
   computerKey('KeyT', 'keyup');
   computerKey('KeyU', 'keyup');
@@ -1074,4 +1108,252 @@ test('每个键都有音名标注，映射标注一个不漏', () => {
   el('key-hint-toggle').checked = true;
   el('key-hint-toggle').dispatchEvent('change');
   assert.ok(!piano.classList.contains('hide-key-hints'));
+});
+
+/* ------------------------------------------------------------------ *
+ * 五线谱
+ * ------------------------------------------------------------------ */
+
+/** 谱表几何常量（与 staff.js 保持一致） */
+const STAFF_SPACE = 16;
+const STAFF_TOP_Y = 116;                                 // (296 - 4×16) / 2
+const STAFF_BOTTOM_Y = STAFF_TOP_Y + STAFF_SPACE * 4;    // E4 所在的那条线
+
+/** 入口脚本在 Piano.App 上留了调试句柄，测试从这里拿实例 */
+function appStaff() {
+  return env.window.Piano.App.staff;
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function collectByClass(root, className) {
+  const found = [];
+  const walk = node => {
+    if (node.getAttribute && node.getAttribute('class') === className) found.push(node);
+    for (const child of node.children || []) walk(child);
+  };
+  walk(root);
+  return found;
+}
+
+function clearStaff() {
+  appStaff().clear();
+}
+
+function staffNotes() {
+  return appStaff().snapshot().notes;
+}
+
+function headYs() {
+  return collectByClass(appStaff().svg, 'note-head')
+    .map(head => Number.parseFloat(head.getAttribute('cy')))
+    .sort((a, b) => a - b);
+}
+
+test('五线谱：同时按下的音堆成一个柱式和弦（实心符头、无符干）', () => {
+  resetAll();
+  clearStaff();
+
+  press(1, 60);   // C4
+  press(2, 64);   // E4
+  press(3, 67);   // G4
+
+  assert.equal(staffNotes().join(' , '), '60 , 64 , 67', '同一柱里有三个音');
+
+  const svg = appStaff().svg;
+  assert.equal(collectByClass(svg, 'note-head').length, 3, '三个符头');
+  assert.equal(collectByClass(svg, 'note-stem').length, 0, '不画符干');
+  assert.equal(collectByClass(svg, 'staff-line').length, 5, '五条谱线');
+  assert.equal(collectByClass(svg, 'clef-path').length, 1, '有一个高音谱号');
+
+  // 符头大小约等于线距
+  const head = collectByClass(svg, 'note-head')[0];
+  const rx = Number.parseFloat(head.getAttribute('rx'));
+  const ry = Number.parseFloat(head.getAttribute('ry'));
+  assert.ok(rx * 2 >= STAFF_SPACE * 1.1, `符头要够大（宽 ${rx * 2}）`);
+  assert.ok(ry * 2 >= STAFF_SPACE * 0.85, `符头要够高（高 ${ry * 2}）`);
+
+  releaseAll();
+});
+
+test('五线谱：只放一个柱式，宽度很窄', () => {
+  resetAll();
+  clearStaff();
+
+  const { width, height } = appStaff().snapshot();
+  assert.ok(width <= 200, `谱面只该留一个音符的宽度，实际 ${width}`);
+  assert.equal(height, 296, '谱面高度');
+
+  // 再多的音也只占这一列，谱面不会变宽
+  press(1, 60); press(2, 64); press(3, 67); press(4, 71); press(5, 74);
+  assert.equal(appStaff().snapshot().width, width, '宽度不随音数变化');
+  assert.equal(headYs().length, 5, '五个音都在同一列');
+  releaseAll();
+  clearStaff();
+});
+
+test('五线谱：真实音高落位正确，超出谱表画加线', () => {
+  resetAll();
+
+  const check = (midi, expectedY, expectedLedgers) => {
+    clearStaff();
+    press(1, midi);
+    assert.equal(headYs()[0], expectedY, `MIDI ${midi} 的纵向位置`);
+    assert.equal(
+      collectByClass(appStaff().svg, 'staff-ledger').length,
+      expectedLedgers,
+      `MIDI ${midi} 的加线数量`,
+    );
+    releaseAll();
+  };
+
+  check(64, STAFF_BOTTOM_Y, 0);                          // E4：最下面那条线
+  check(77, STAFF_TOP_Y, 0);                             // F5：最上面那条线
+  check(60, STAFF_BOTTOM_Y + STAFF_SPACE, 1);            // C4：下加一线
+  check(84, STAFF_TOP_Y - STAFF_SPACE * 2, 2);           // C6：上加二线
+
+  clearStaff();
+});
+
+test('五线谱：符头一律错开——线上偏左、线间偏右，不存在居中', () => {
+  resetAll();
+  clearStaff();
+
+  // 单音：符头落在列中心左侧或右侧，绝不居中，且离谱号有距离
+  press(1, 64);                       // E4：最下面那条线（音级 30，偶数 = 线上 → 偏左）
+  let heads = collectByClass(appStaff().svg, 'note-head');
+  assert.equal(heads.length, 1);
+  const columnX = 104;                // 与 staff.js 的 COLUMN_X 一致
+  const e4x = Number.parseFloat(heads[0].getAttribute('cx'));
+  assert.ok(e4x < columnX, `线上的音应偏左（cx=${e4x}）`);
+  assert.ok(e4x >= 80, `符头要离高音谱号远一点（cx=${e4x}）`);
+  releaseAll();
+
+  // C 大三和弦：C4/E4/G4 音级 28/30/32 全是偶数（都在线上）→ 三个符头同一边
+  clearStaff();
+  press(1, 60);
+  press(2, 64);
+  press(3, 67);
+  let xs = collectByClass(appStaff().svg, 'note-head')
+    .map(head => Number.parseFloat(head.getAttribute('cx')));
+  assert.equal(new Set(xs.map(x => Math.round(x))).size, 1, '都在线上的音用同一边');
+  assert.ok(xs[0] < columnX, '线上的音偏左');
+  releaseAll();
+
+  // C4 + D4：音级 28（线上）与 29（线间）→ 一个偏左一个偏右，正好相切
+  clearStaff();
+  press(1, 60);
+  press(2, 62);
+  heads = collectByClass(appStaff().svg, 'note-head')
+    .map(head => ({
+      cx: Number.parseFloat(head.getAttribute('cx')),
+      cy: Number.parseFloat(head.getAttribute('cy')),
+    }))
+    .sort((a, b) => b.cy - a.cy);    // cy 越大音越低
+  assert.equal(heads.length, 2);
+  assert.ok(heads[0].cx < columnX, '低音 C4 在线上 → 偏左');
+  assert.ok(heads[1].cx > columnX, '高音 D4 在线间 → 偏右');
+  assert.ok(heads[1].cx - heads[0].cx >= 18, '左右错开的距离要够（符头相切）');
+
+  releaseAll();
+  clearStaff();
+});
+
+test('五线谱：踩着踏板弹的音全部穿进同一柱', async () => {
+  resetAll();
+  clearStaff();
+
+  pressSpace();                 // 踩住踏板
+  press(1, 60); release(1);
+  await sleep(150);             // 中间停顿：不踩踏板时早就另起一柱了
+  press(2, 64); release(2);
+  await sleep(150);
+  press(3, 67); release(3);
+
+  assert.equal(staffNotes().join(' , '), '60 , 64 , 67', '踏板期间的所有音都在同一柱');
+  assert.equal(collectByClass(appStaff().svg, 'note-head').length, 3);
+
+  releaseSpace();
+  clearStaff();
+});
+
+test('五线谱：松开踏板立刻清空整个谱面', async () => {
+  resetAll();
+  clearStaff();
+
+  pressSpace();
+  press(1, 60);
+  press(2, 64);
+  releaseAll();                 // 松键，但踏板还踩着
+  assert.equal(staffNotes().join(' , '), '60 , 64', '踏板踩着时保留');
+
+  releaseSpace();               // 抬踏板 = 这一段结束
+  assert.equal(staffNotes().length, 0, '抬踏板即清空');
+  assert.equal(collectByClass(appStaff().svg, 'note-head').length, 0, '谱面立刻变空');
+
+  // 再弹一次还是从空的一柱开始
+  pressSpace();
+  press(3, 67);
+  assert.equal(staffNotes().join(' , '), '67');
+  releaseAll();
+  releaseSpace();
+  assert.equal(staffNotes().length, 0);
+
+  clearStaff();
+});
+
+test('五线谱：不踩踏板时，下一次演奏同样替换掉上一个柱式', async () => {
+  resetAll();
+  clearStaff();
+
+  press(1, 60); release(1);
+  await sleep(150);
+  press(1, 64); release(1);
+
+  assert.equal(staffNotes().join(' , '), '64');
+  clearStaff();
+});
+
+test('五线谱：升降号按和弦的音程关系写', () => {
+  resetAll();
+
+  // C 小三和弦 → 只有 Eb 是变化音，写成降号
+  clearStaff();
+  press(1, 60); press(2, 63); press(3, 67);
+  let signs = collectByClass(appStaff().svg, 'staff-accidental');
+  assert.equal(signs.length, 1);
+  assert.equal(signs[0].textContent, '♭', 'Cm 的三音写成 Eb（降号）');
+  releaseAll();
+
+  // C# 小三和弦 → C# 与 G# 都用升号
+  clearStaff();
+  press(1, 61); press(2, 64); press(3, 68);
+  signs = collectByClass(appStaff().svg, 'staff-accidental');
+  assert.equal(signs.length, 2);
+  assert.equal(signs.map(sign => sign.textContent).join(''), '♯♯');
+  releaseAll();
+
+  clearStaff();
+});
+
+test('五线谱开关：关掉后不画，打开时把之前的补画出来', () => {
+  resetAll();
+  clearStaff();
+
+  el('staff-toggle').checked = false;
+  el('staff-toggle').dispatchEvent('change');
+  assert.ok(el('score-sheet').classList.contains('is-hidden'), '关掉后谱面隐藏');
+
+  press(1, 60);
+  press(2, 64);
+  assert.equal(staffNotes().join(' , '), '60 , 64', '关着时仍然记录');
+  assert.equal(collectByClass(appStaff().svg, 'note-head').length, 0, '关着时不画');
+
+  el('staff-toggle').checked = true;
+  el('staff-toggle').dispatchEvent('change');
+  assert.ok(!el('score-sheet').classList.contains('is-hidden'));
+  assert.equal(collectByClass(appStaff().svg, 'note-head').length, 2, '打开后补画出来');
+
+  releaseAll();
+  clearStaff();
 });

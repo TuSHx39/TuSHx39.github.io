@@ -28,6 +28,7 @@ const DEFAULTS = {
   waveform: 'piano',
   showNoteName: true,
   showKeyHints: true,
+  showStaff: true,
   showChord: true,
   allowInversion: true,
   showPedal: true,
@@ -47,6 +48,7 @@ function collectElements() {
   el.pedal = document.getElementById('pedal');
   el.noteEl = document.getElementById('current-note');
   el.chordEl = document.getElementById('current-chord');
+  el.chordSide = document.getElementById('chord-side');
   el.chordAltEl = document.getElementById('current-chord-alt');
   el.settingsBtn = document.getElementById('settings-btn');
   el.settingsPanel = document.getElementById('settings-panel');
@@ -56,6 +58,8 @@ function collectElements() {
   el.waveformSelect = document.getElementById('waveform-select');
   el.noteNameToggle = document.getElementById('note-name-toggle');
   el.keyHintToggle = document.getElementById('key-hint-toggle');
+  el.staffToggle = document.getElementById('staff-toggle');
+  el.scoreSheet = document.getElementById('score-sheet');
   el.chordToggle = document.getElementById('chord-toggle');
   el.inversionToggle = document.getElementById('inversion-toggle');
   el.inversionSetting = document.getElementById('inversion-setting');
@@ -79,6 +83,8 @@ function setSustain(on) {
   sustainOn = next;
   el.body.classList.toggle('sustain-on', next);
   synth.setSustain(next);
+  // 抬踏板：五线谱先留着，下一次演奏时才清空
+  if (!next && staff) staff.pedalReleased();
   scheduleRefresh();
 }
 
@@ -112,10 +118,30 @@ function handlePedalUp() {
 let synth = null;
 let keyboard = null;
 let panel = null;
+let staff = null;
+
+/** 实际按着（琴键 / 电脑键盘）的音：五线谱用它判断「同一个和弦」 */
+const heldKeys = new Set();
+
+/** 弹一个音：发声 + 记谱 */
+function playNote(midi) {
+  synth.resume();
+  synth.noteOn(midi);
+  heldKeys.add(midi);
+  if (staff) staff.pushNote(midi, { spelling: spellingHints.get(midi) });
+  scheduleRefresh();
+}
+
+/** 松开一个音 */
+function endNote(midi) {
+  synth.noteOff(midi);
+  heldKeys.delete(midi);
+  scheduleRefresh();
+}
 
 /** 创建各模块实例；缺少任何脚本时给出可读的提示（而不是一行 TypeError） */
 function setup() {
-  for (const name of ['Chords', 'Synth', 'Keyboard', 'Panel', 'Store']) {
+  for (const name of ['Chords', 'Synth', 'Keyboard', 'Panel', 'Store', 'Staff']) {
     if (!Piano[name]) {
       throw new Error(`piano: 缺少 js/${name.toLowerCase()}.js，请检查 piano.html 里的脚本引用顺序`);
     }
@@ -128,22 +154,22 @@ function setup() {
     onVoicesChanged: () => scheduleRefresh(),
   });
 
+  staff = Piano.Staff.createStaff({
+    container: el.scoreSheet,
+    isHeld: midi => heldKeys.has(midi),
+    isSustain: () => sustainOn,
+  });
+
   keyboard = Piano.Keyboard.createKeyboard({
     container: el.piano,
     wrapper: el.pianoWrapper,
     firstMidi: FIRST_MIDI,
     lastMidi: LAST_MIDI,
-    onNoteOn: midi => {
-      synth.resume();
-      synth.noteOn(midi);
-      scheduleRefresh();
-    },
-    onNoteOff: midi => {
-      synth.noteOff(midi);
-      scheduleRefresh();
-    },
+    onNoteOn: midi => playNote(midi),
+    onNoteOff: midi => endNote(midi),
     onPointerUp: () => {
       synth.releaseAllHeld();
+      heldKeys.clear();
       scheduleRefresh();
     },
     onInteract: () => synth.resume(),
@@ -192,13 +218,16 @@ function refreshDisplay() {
   if (!state.showChord) return;
 
   if (!analysis || !analysis.primary) {
-    el.chordEl.textContent = '当前和弦：-';
+    // 没有和弦：不显示 "-"，整块留空
+    el.chordEl.textContent = '';
+    el.chordSide.classList.add('is-empty');
     el.chordAltEl.textContent = '';
     el.chordAltEl.classList.add('is-hidden');
     return;
   }
 
-  el.chordEl.textContent = `当前和弦：${analysis.primary.symbol}`;
+  el.chordEl.textContent = analysis.primary.symbol;
+  el.chordSide.classList.remove('is-empty');
 
   const alternatives = analysis.candidates
     .slice(1, 1 + MAX_ALTERNATIVES)
@@ -234,6 +263,7 @@ function applySettingsToControls() {
   if (WAVEFORMS.includes(state.waveform)) el.waveformSelect.value = state.waveform;
   el.noteNameToggle.checked = Boolean(state.showNoteName);
   el.keyHintToggle.checked = Boolean(state.showKeyHints);
+  el.staffToggle.checked = Boolean(state.showStaff);
   el.chordToggle.checked = Boolean(state.showChord);
   el.inversionToggle.checked = Boolean(state.allowInversion);
   el.pedalToggle.checked = Boolean(state.showPedal);
@@ -245,10 +275,11 @@ function applySettingsToControls() {
 function applyUiState() {
   el.body.classList.toggle('pedal-hidden', !state.showPedal);
   el.noteEl.classList.toggle('is-hidden', !state.showNoteName);
-  el.chordEl.classList.toggle('is-hidden', !state.showChord);
+  el.chordSide.classList.toggle('is-hidden', !state.showChord);
   if (!state.showChord) el.chordAltEl.classList.add('is-hidden');
   keyboard.setLabelsVisible(state.showNoteName);
   keyboard.setHintsVisible(state.showKeyHints);
+  if (staff) staff.setVisible(state.showStaff);
 
   const showChordSub = Boolean(state.showChord);
   el.inversionSetting.classList.toggle('show', showChordSub);
@@ -294,6 +325,12 @@ function bindControls() {
 
   el.keyHintToggle.addEventListener('change', () => {
     state.showKeyHints = el.keyHintToggle.checked;
+    applyUiState();
+    persist();
+  });
+
+  el.staffToggle.addEventListener('change', () => {
+    state.showStaff = el.staffToggle.checked;
     applyUiState();
     persist();
   });
@@ -355,8 +392,7 @@ function releaseComputerKey(code) {
   const stillHeld = [...computerKeys.values()].some(item => item.midi === entry.midi);
   if (!stillHeld) spellingHints.delete(entry.midi);
 
-  synth.noteOff(entry.midi);
-  scheduleRefresh();
+  endNote(entry.midi);
 }
 
 function bindComputerKeys() {
@@ -377,9 +413,7 @@ function bindComputerKeys() {
 
     computerKeys.set(event.code, resolved);
     spellingHints.set(resolved.midi, resolved.spelling);
-    synth.resume();
-    synth.noteOn(resolved.midi);
-    scheduleRefresh();
+    playNote(resolved.midi);
   });
 
   document.addEventListener('keyup', event => {
@@ -435,6 +469,7 @@ function bindPedal() {
     keyboard.clearPressed();
     computerKeys.clear();
     spellingHints.clear();
+    heldKeys.clear();
     pedalPressed = false;
     pedalPointerId = null;
     spacePressed = false;
@@ -483,6 +518,7 @@ Piano.App = {
   get state() { return state; },
   get synth() { return synth; },
   get keyboard() { return keyboard; },
+  get staff() { return staff; },
 };
 
 if (document.readyState === 'loading') {

@@ -75,10 +75,9 @@ body {
 }
 
 /* ------------------------------------------------------------
-   读数：当前和弦 / 候选 / 当前音
+   读数：候选和弦 / 当前音（主和弦已移到五线谱右侧）
    ------------------------------------------------------------ */
 
-#current-chord,
 #current-chord-alt,
 #current-note {
   position: fixed;
@@ -95,19 +94,6 @@ body {
     bottom .3s var(--ease),
     opacity .22s ease,
     visibility .22s ease;
-}
-
-#current-chord {
-  bottom: calc(var(--pedal-h) + var(--stage-h) + 86px);
-  max-width: min(92vw, 900px);
-  padding: 8px 20px;
-  border-radius: 999px;
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: .02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 #current-chord-alt {
@@ -328,6 +314,99 @@ body.sustain-on .felt {
 
 .hide-key-hints .key-hint {
   display: none;
+}
+
+/* ------------------------------------------------------------
+   五线谱（偏左）与和弦符号（偏右）
+   两者各自固定定位、互不依赖；中间留出空隙
+   ------------------------------------------------------------ */
+
+:root {
+  --score-bottom: calc(var(--pedal-h) + var(--stage-h) + 142px);
+  --score-height: 296px;
+}
+
+/* 谱面：背景透明，直接贴在网页背景上（所以不存在配色不一致的问题） */
+.sheet {
+  position: fixed;
+  right: calc(50% + 88px);
+  bottom: var(--score-bottom);
+  width: 178px;
+  height: var(--score-height);
+  overflow: hidden;
+  pointer-events: none;
+  transition: bottom .3s var(--ease), opacity .22s ease, visibility .22s ease;
+}
+
+.staff-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 和弦区域：与谱面完全独立，内容在区域内水平居中，
+   符号本身与谱表中线同高，标注贴在符号正上方 */
+.chord-side {
+  position: fixed;
+  left: calc(50% + 24px);
+  bottom: var(--score-bottom);
+  width: 220px;
+  height: var(--score-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transition: bottom .3s var(--ease), opacity .22s ease, visibility .22s ease;
+}
+
+.chord-label {
+  /* 「当前和弦：」暂时隐藏，留着元素方便随时打开 */
+  display: none;
+}
+
+#current-chord {
+  font-size: 42px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: .01em;
+  color: var(--ink);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* 没有和弦时整块留空 */
+.chord-side.is-empty #current-chord {
+  visibility: hidden;
+}
+
+.staff-line,
+.staff-ledger {
+  stroke: #2b3240;
+  stroke-width: 1.1;
+}
+
+.staff-ledger {
+  stroke-width: 1.6;
+}
+
+.clef-path {
+  fill: none;
+  stroke: #1d2430;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 符头：实心、只有头（无符干），大小约等于线距 */
+.note-head {
+  fill: #161c26;
+}
+
+.staff-accidental {
+  fill: #161c26;
+  font-family: "Times New Roman", "Songti SC", serif;
+  text-anchor: middle;
+  dominant-baseline: middle;
 }
 
 /* ------------------------------------------------------------
@@ -632,18 +711,55 @@ body.sustain-on .pedal {
     display: none;
   }
 
-  #current-chord {
-    bottom: calc(var(--pedal-h) + var(--stage-h) + 62px);
-    font-size: 19px;
-    padding: 6px 14px;
-  }
-
   #current-chord-alt {
     bottom: calc(var(--pedal-h) + var(--stage-h) + 26px);
   }
 
   #current-note {
     bottom: calc(var(--pedal-h) + var(--stage-h) + 4px);
+  }
+
+  /* 矮窗口：谱面与和弦各自等比缩小（锚点不变，互不影响） */
+  .sheet {
+    transform: scale(.72);
+    transform-origin: 100% 100%;
+  }
+
+  .chord-side {
+    transform: scale(.72);
+    transform-origin: 0 100%;
+  }
+}
+
+/* 极矮的窗口（例如横屏手机）：再缩一档，保证键盘和读数可用 */
+@media (max-height: 520px) {
+  .sheet {
+    transform: scale(.56);
+  }
+
+  .chord-side {
+    transform: scale(.56);
+  }
+}
+
+/* 窄屏：把两者往中间收，并缩一点，避免和弦区域溢出 */
+@media (max-width: 700px) {
+  :root {
+    --score-height: 250px;
+  }
+
+  .sheet {
+    right: calc(50% + 26px);
+    width: 152px;
+  }
+
+  .chord-side {
+    left: calc(50% + 12px);
+    width: 150px;
+  }
+
+  #current-chord {
+    font-size: 32px;
   }
 }
 

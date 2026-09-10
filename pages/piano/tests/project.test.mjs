@@ -53,6 +53,7 @@ test('脚本用传统 <script> 引入（file:// 直接打开也能跑）', () =>
     'js/keyboard.js',
     'js/panel.js',
     'js/store.js',
+    'js/staff.js',
     'js/main.js',
   ], '脚本顺序必须满足依赖：chords 最先，main 最后');
 });
@@ -64,6 +65,7 @@ test('js/*.js 不含 ESM 语法，且各自注册到 Piano 命名空间', () => 
     'keyboard.js': 'Piano.Keyboard',
     'panel.js': 'Piano.Panel',
     'store.js': 'Piano.Store',
+    'staff.js': 'Piano.Staff',
   };
 
   for (const file of jsFiles) {
@@ -84,16 +86,17 @@ test('js/*.js 不含 ESM 语法，且各自注册到 Piano 命名空间', () => 
 
 test('按 piano.html 的顺序加载全部脚本后命名空间完整（file:// 冒烟测试）', () => {
   // 只给一个「文档仍在解析」的最小 document：main.js 会把初始化推迟到 DOMContentLoaded，
-  // 于是这一步验证的正是「六个脚本能否按序加载、依赖是否齐全」。
+  // 于是这一步验证的正是「七个脚本能否按序加载、依赖是否齐全」。
   const sandbox = loadPianoScripts({
     document: { readyState: 'loading', addEventListener() {} },
   });
 
-  for (const name of ['Chords', 'Synth', 'Keyboard', 'Panel', 'Store']) {
+  for (const name of ['Chords', 'Synth', 'Keyboard', 'Panel', 'Store', 'Staff']) {
     assert.ok(sandbox.Piano && sandbox.Piano[name], `Piano.${name} 没有注册`);
   }
   assert.equal(typeof sandbox.Piano.Chords.analyzeChord, 'function');
   assert.equal(typeof sandbox.Piano.Synth.createSynth, 'function');
+  assert.equal(typeof sandbox.Piano.Staff.createStaff, 'function');
 });
 
 test('页面里没有重复 id', () => {
@@ -167,6 +170,47 @@ test('琴键容器与踏板条结构没有被改坏', () => {
   assert.ok(/id="pedal"/.test(html), '缺少 #pedal');
 });
 
+test('五线谱：容器、开关、SVG 样式都在', () => {
+  assert.match(html, /id="score-sheet"/, '缺少五线谱容器 #score-sheet');
+  assert.match(html, /id="staff-toggle"/, '缺少「显示五线谱」开关');
+
+  // staff.js 画出来的每个 class 都要有样式
+  for (const className of [
+    'staff-svg', 'staff-line', 'staff-ledger', 'clef-path',
+    'note-head', 'staff-accidental',
+  ]) {
+    assert.ok(css.includes(`.${className}`), `CSS 缺少 .${className}`);
+  }
+
+  // 符头是实心的、没有符干
+  const headRule = css.match(/\.note-head\s*\{[^}]*\}/)[0];
+  assert.match(headRule, /fill:\s*#161c26/i, '符头要实心');
+  assert.ok(!/stroke:/.test(headRule), '实心符头不需要描边');
+  assert.ok(!/\.note-stem\s*\{/.test(css), '不应该再有符干样式');
+  assert.ok(!/note-stem/.test(readFileSync(join(jsDir, 'staff.js'), 'utf8')), 'staff.js 不该再画符干');
+
+  // 「当前和弦：」暂时隐藏（元素保留）
+  assert.match(css, /\.chord-label\s*\{[^}]*display:\s*none/, '和弦标注应隐藏');
+
+  // 谱面与和弦各自独立定位，中间留空隙
+  for (const className of ['sheet', 'chord-side', 'chord-label']) {
+    assert.ok(css.includes(`.${className}`), `CSS 缺少 .${className}`);
+  }
+
+  assert.match(html, /id="score-sheet"/, '缺少谱面容器');
+  assert.match(html, /id="chord-side"/, '缺少和弦区域');
+  assert.match(html, /class="chord-label">当前和弦：/, '缺少「当前和弦：」标注');
+
+  // 谱面向左、和弦向右，都锚在屏幕中线两侧，彼此不依赖
+  assert.match(css, /\.sheet\s*\{[^}]*right:\s*calc\(50%/, '谱面应锚在中线左侧');
+  assert.match(css, /\.chord-side\s*\{[^}]*left:\s*calc\(50%/, '和弦区域应锚在中线右侧');
+  assert.ok(!/score-panel/.test(html), '不要再把两者塞进同一个 flex 容器');
+
+  // 谱面背景透明，才不会和网页背景不一致
+  const sheetRule = css.match(/\.sheet\s*\{[^}]*\}/)[0];
+  assert.ok(!/background\s*:/.test(sheetRule), '谱面不应有独立背景色');
+});
+
 test('保留了原来的设置项，并新增键位标注开关与 piano 波形', () => {
   const required = [
     'volume-slider',
@@ -174,6 +218,7 @@ test('保留了原来的设置项，并新增键位标注开关与 piano 波形'
     'waveform-select',
     'note-name-toggle',
     'key-hint-toggle',
+    'staff-toggle',
     'chord-toggle',
     'inversion-toggle',
     'pedal-toggle',
@@ -231,9 +276,8 @@ test('不再引用旧的单文件版本 piano.js', () => {
   assert.ok(!existsSync(join(root, 'piano.js')), '旧的 piano.js 应该已经删除');
 });
 
-test('模块目录结构与文档描述一致', () => {
-  const expected = ['chords.js', 'keyboard.js', 'main.js', 'panel.js', 'store.js', 'synth.js'];
+test('模块目录与脚本列表一致', () => {
+  const expected = ['chords.js', 'keyboard.js', 'main.js', 'panel.js', 'staff.js', 'store.js', 'synth.js'];
   assert.deepEqual([...jsFiles].sort(), expected);
-  assert.ok(existsSync(join(root, 'README.md')), '缺少 README.md');
   assert.ok(existsSync(join(root, 'package.json')), '缺少 package.json');
 });

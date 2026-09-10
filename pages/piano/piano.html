@@ -59,6 +59,11 @@
           </div>
 
           <div class="setting-item">
+            <label for="staff-toggle">显示五线谱</label>
+            <input type="checkbox" id="staff-toggle" checked>
+          </div>
+
+          <div class="setting-item">
             <label for="chord-toggle">识别和弦</label>
             <input type="checkbox" id="chord-toggle" checked>
           </div>
@@ -111,8 +116,16 @@
     <p class="hint">键盘/鼠标弹奏  Shift+左侧键 / Alt+右侧键 弹黑键  空格延音  拖动连奏</p>
   </div>
 
-  <!-- 读数：主和弦 / 候选 / 当前音 -->
-  <div id="current-chord">当前和弦：-</div>
+  <!-- 五线谱：固定位置（偏左），永远只画一个柱式和弦 -->
+  <div class="sheet is-hidden" id="score-sheet"></div>
+
+  <!-- 和弦符号：独立区域（偏右），与谱面互不依赖，标注和符号都居中 -->
+  <div class="chord-side is-empty" id="chord-side">
+    <span class="chord-label">当前和弦：</span>
+    <span id="current-chord"></span>
+  </div>
+
+  <!-- 候选和弦（保持原位）+ 当前音 -->
   <div id="current-chord-alt" class="is-hidden"></div>
   <div id="current-note">当前音: -</div>
 
@@ -134,6 +147,7 @@
   <script src="js/keyboard.js"></script>
   <script src="js/panel.js"></script>
   <script src="js/store.js"></script>
+  <script src="js/staff.js"></script>
   <script src="js/main.js"></script>
 
 </body>
