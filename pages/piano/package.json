@@ -1,0 +1,9 @@
+{
+  "name": "tushx39-piano",
+  "private": true,
+  "description": "虚拟钢琴：浏览器内的多波形键盘、踏板延音与和弦 / 转位识别",
+  "scripts": {
+    "test": "node --test tests",
+    "test:single": "node --test --test-isolation=none \"tests/*.test.mjs\""
+  }
+}
