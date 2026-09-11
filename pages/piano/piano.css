@@ -3,7 +3,7 @@
    ------------------------------------------------------------
    布局分三层：
      顶部  标题 / 和弦 / 音名读数
-     中层  设置面板（玻璃拟态，主设置 ⇄ 踏板设置）
+     中层  设置面板（玻璃拟态，主设置 ⇄ 子设置：踏板 / 五线谱）
      底部  琴床（毛毡 + 白键 / 黑键）与踏板条
    键床尺寸统一由 CSS 变量描述，黑键位置由 JS 实测白键像素得出，
    因此改这里的数值（含响应式断点）不需要同步修改脚本。
@@ -326,6 +326,11 @@ body.sustain-on .felt {
   --score-height: 296px;
 }
 
+/* 双声部（大谱表）时谱面要更高：上高音、下低音，中间留出空隙 */
+body.grand-staff {
+  --score-height: 360px;
+}
+
 /* 谱面：背景透明，直接贴在网页背景上（所以不存在配色不一致的问题） */
 .sheet {
   position: fixed;
@@ -335,7 +340,7 @@ body.sustain-on .felt {
   height: var(--score-height);
   overflow: hidden;
   pointer-events: none;
-  transition: bottom .3s var(--ease), opacity .22s ease, visibility .22s ease;
+  transition: bottom .3s var(--ease), height .3s var(--ease), opacity .22s ease, visibility .22s ease;
 }
 
 .staff-svg {
@@ -395,6 +400,12 @@ body.sustain-on .felt {
   stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* 谱号里实心的部分（中音谱号中央的方块、低音谱号右侧的两个点） */
+.clef-fill {
+  fill: #1d2430;
+  stroke: none;
 }
 
 /* 符头：实心、只有头（无符干），大小约等于线距 */
@@ -480,8 +491,10 @@ body.sustain-on .pedal {
 #settings-panel {
   position: fixed;
   top: -55vh;
-  left: 8vw;
-  width: 84vw;
+  right: 0;
+  left: auto;
+  /* 只占屏幕右半边（宽屏再收窄一点），这样每行的标签与控件不会离得太远 */
+  width: min(48vw, 440px);
   height: 50vh;
 
   background: rgba(160, 165, 170, 0.18);
@@ -491,7 +504,7 @@ body.sustain-on .pedal {
   border: 1px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 
-  border-radius: 0 0 22px 22px;
+  border-radius: 0 0 0 22px;
   transition: top .38s var(--ease);
 
   z-index: 9000;
@@ -513,29 +526,28 @@ body.sustain-on .pedal {
   font-size: 22px;
 }
 
+/* 三张页平铺，靠 --page-index 整体平移（面板宽度刚好露出一张）
+   注意：加/减子页时，这里的 300% 与 .page 的 33.3333% 要跟着改 */
 .settings-pages {
   display: flex;
-  width: 200%;
+  width: 300%;
+  --page-index: 0;
+  transform: translateX(calc(var(--page-index) * -33.3333%));
   transition: transform .38s var(--ease);
-  transform: translateX(0);
-}
-
-.settings-pages.show-sub {
-  transform: translateX(-50%);
 }
 
 .page {
-  width: 100%;
+  flex: 0 0 33.3333%;
   padding: 20px 32px 24px;
-}
-
-.page.main,
-.page.sub {
-  pointer-events: auto;
-}
-
-.settings-pages.show-sub .page.main {
+  /* 没露出来的页不该被点到；顺手淡一点，翻页时更顺 */
+  opacity: .3;
   pointer-events: none;
+  transition: opacity .28s ease;
+}
+
+.page.is-active {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sub-header {
@@ -644,6 +656,33 @@ body.sustain-on .pedal {
   opacity: .9;
 }
 
+/* 五线谱子选项：总开关关掉时只是变暗，位置与高度照旧保留（不消失、不塌陷） */
+.staff-options {
+  transition: opacity .22s ease;
+}
+
+.staff-options.is-dim {
+  opacity: .35;
+  pointer-events: none;
+}
+
+.staff-option {
+  padding-left: 12px;
+  border-left: 2px solid rgba(0, 0, 0, 0.08);
+  transition: opacity .2s ease;
+}
+
+/* 双声部固定「上高音、下低音」，谱号选择暂时锁住 */
+.staff-option.is-locked {
+  opacity: .45;
+  pointer-events: none;
+}
+
+#clef-select:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
 /* ------------------------------------------------------------
    响应式：窄屏收紧键床与读数
    ------------------------------------------------------------ */
@@ -668,15 +707,12 @@ body.sustain-on .pedal {
     display: none;
   }
 
-  #current-chord {
-    font-size: 20px;
-    padding: 7px 16px;
-  }
-
   #settings-panel {
-    left: 4vw;
-    width: 92vw;
+    right: 4vw;
+    left: auto;
+    width: 88vw;
     height: 58vh;
+    border-radius: 0 0 22px 22px;
   }
 
   .page {
@@ -700,7 +736,40 @@ body.sustain-on .pedal {
   }
 }
 
-/* 矮窗口（横屏手机、小窗）：压低键床并收紧读数间距，避免读数被顶出画面 */
+/* 双声部比单谱表高一大截，矮一点的窗口按档缩小，免得上半张被顶出画面
+   （和弦区跟着一起缩，两者中线才对得齐） */
+@media (max-height: 900px) {
+  body.grand-staff .sheet {
+    transform: scale(.8);
+    transform-origin: 100% 100%;
+  }
+
+  body.grand-staff .chord-side {
+    transform: scale(.8);
+    transform-origin: 0 100%;
+  }
+}
+
+@media (max-height: 780px) {
+  body.grand-staff .sheet {
+    transform: scale(.68);
+  }
+
+  body.grand-staff .chord-side {
+    transform: scale(.68);
+  }
+}
+
+@media (max-height: 680px) {
+  body.grand-staff .sheet {
+    transform: scale(.58);
+  }
+
+  body.grand-staff .chord-side {
+    transform: scale(.58);
+  }
+}
+
 @media (max-height: 620px) {
   :root {
     --keys-h: 152px;
@@ -729,6 +798,15 @@ body.sustain-on .pedal {
     transform: scale(.72);
     transform-origin: 0 100%;
   }
+
+  /* 双声部再小一档（它本来就更宽更高） */
+  body.grand-staff .sheet {
+    transform: scale(.6);
+  }
+
+  body.grand-staff .chord-side {
+    transform: scale(.6);
+  }
 }
 
 /* 极矮的窗口（例如横屏手机）：再缩一档，保证键盘和读数可用 */
@@ -739,6 +817,14 @@ body.sustain-on .pedal {
 
   .chord-side {
     transform: scale(.56);
+  }
+
+  body.grand-staff .sheet {
+    transform: scale(.46);
+  }
+
+  body.grand-staff .chord-side {
+    transform: scale(.46);
   }
 }
 

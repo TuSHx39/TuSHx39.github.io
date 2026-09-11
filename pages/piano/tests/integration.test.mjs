@@ -55,6 +55,22 @@ class FakeClassList {
   }
 }
 
+class FakeStyle {
+  constructor() {
+    this.properties = {};
+  }
+
+  setProperty(name, value) {
+    this.properties[name] = String(value);
+  }
+
+  getPropertyValue(name) {
+    return Object.prototype.hasOwnProperty.call(this.properties, name)
+      ? this.properties[name]
+      : '';
+  }
+}
+
 class FakeElement {
   constructor(tagName, ownerDocument = null) {
     this.tagName = String(tagName).toUpperCase();
@@ -63,11 +79,12 @@ class FakeElement {
     this.parentElement = null;
     this.classList = new FakeClassList();
     this.dataset = {};
-    this.style = {};
+    this.style = new FakeStyle();
     this.attributes = {};
     this.listeners = new Map();
     this.textContent = '';
     this.checked = false;
+    this.disabled = false;
     this.value = '';
     this.isFragment = false;
     this.left = 0;
@@ -392,8 +409,19 @@ function createEnvironment() {
     },
     querySelector(selector) {
       if (selector === '.settings-pages' && !elements.has('__pages')) {
+        // 与 piano.html 对应：主页面 + 踏板子页 + 五线谱子页
         const pages = new FakeElement('div');
         pages.className = 'settings-pages';
+        for (const [className, id] of [
+          ['page main', 'page-main'],
+          ['page sub', 'sub-pedal-settings'],
+          ['page sub', 'sub-staff-settings'],
+        ]) {
+          const page = new FakeElement('div');
+          page.className = className;
+          page.setAttribute('id', id);
+          pages.appendChild(page);
+        }
         elements.set('__pages', pages);
       }
       return elements.get('__pages') || null;
@@ -443,6 +471,7 @@ function createEnvironment() {
       hitTarget = element;
     },
     element: id => document.getElementById(id),
+    pages: () => document.querySelector('.settings-pages'),
   };
 }
 
@@ -561,6 +590,14 @@ function resetAll() {
   el('toggle-pedal-toggle').dispatchEvent('change');
   el('inversion-toggle').checked = true;
   el('inversion-toggle').dispatchEvent('change');
+
+  // 五线谱：总开关、谱号、双声部都回到默认
+  el('staff-toggle').checked = true;
+  el('staff-toggle').dispatchEvent('change');
+  el('clef-select').value = 'treble';
+  el('clef-select').dispatchEvent('change');
+  el('grand-toggle').checked = false;
+  el('grand-toggle').dispatchEvent('change');
 }
 
 /* ------------------------------------------------------------------ *
@@ -1314,15 +1351,46 @@ test('五线谱：松开踏板立刻清空整个谱面', async () => {
   clearStaff();
 });
 
-test('五线谱：不踩踏板时，下一次演奏同样替换掉上一个柱式', async () => {
+test('五线谱与「当前音」实时一致', () => {
   resetAll();
   clearStaff();
 
-  press(1, 60); release(1);
-  await sleep(150);
-  press(1, 64); release(1);
+  const noteText = () => el('current-note').textContent;
+  const headCount = () => collectByClass(appStaff().svg, 'note-head').length;
 
-  assert.equal(staffNotes().join(' , '), '64');
+  // 同时按三个音：读数与谱面一致
+  press(1, 60);
+  press(2, 64);
+  press(3, 67);
+  assert.equal(noteText(), '当前音: C4 , E4 , G4');
+  assert.equal(headCount(), 3);
+
+  // 松开一个：两边同时少一个
+  release(2);
+  assert.equal(noteText(), '当前音: C4 , G4');
+  assert.equal(headCount(), 2);
+
+  // 全部松开（没踩踏板）：两边同时清空
+  releaseAll();
+  assert.equal(noteText(), '当前音: -');
+  assert.equal(staffNotes().length, 0);
+  assert.equal(headCount(), 0);
+
+  // 踩住踏板再弹：松手后两边都保留，抬踏板后两边同时清空
+  clearStaff();
+  pressSpace();
+  press(1, 60);
+  press(2, 64);
+  releaseAll();
+  assert.equal(noteText(), '当前音: C4 , E4');
+  assert.equal(staffNotes().join(' , '), '60 , 64');
+  assert.equal(headCount(), 2);
+
+  releaseSpace();
+  assert.equal(noteText(), '当前音: -');
+  assert.equal(staffNotes().length, 0);
+  assert.equal(headCount(), 0, '抬踏板后谱面同步清空');
+
   clearStaff();
 });
 
@@ -1367,5 +1435,215 @@ test('五线谱开关：关掉后不画，打开时把之前的补画出来', ()
   assert.equal(collectByClass(appStaff().svg, 'note-head').length, 2, '打开后补画出来');
 
   releaseAll();
+  clearStaff();
+});
+
+/* ------------------------------------------------------------------ *
+ * 五线谱设置子页：翻页 / 变暗 / 谱号 / 双声部
+ * ------------------------------------------------------------------ */
+
+/** 设置面板里的一行（用于模拟点击行本身，桩里事件不会冒泡） */
+function settingsRow(subName) {
+  const row = new FakeElement('div');
+  row.className = 'setting-item has-sub';
+  row.setAttribute('data-sub', subName);
+  return row;
+}
+
+function backButton() {
+  const button = new FakeElement('button');
+  button.className = 'back-btn';
+  return button;
+}
+
+function pageIndex() {
+  return env.pages().style.getPropertyValue('--page-index');
+}
+
+function pickClef(value) {
+  el('clef-select').value = value;
+  el('clef-select').dispatchEvent('change');
+}
+
+function setGrand(on) {
+  el('grand-toggle').checked = on;
+  el('grand-toggle').dispatchEvent('change');
+}
+
+/** 弹一个音，返回符头的 y（弹完立刻松开并清谱） */
+function yOf(midi) {
+  clearStaff();
+  press(1, midi);
+  const ys = headYs();
+  releaseAll();
+  return ys[0];
+}
+
+test('设置面板：三张页按 data-sub 翻页，返回键回主页面', () => {
+  resetAll();
+  clearStaff();
+
+  const pages = env.pages();
+  const panelElement = el('settings-panel');
+
+  assert.equal(pages.children.length, 3, '主页面 + 踏板 + 五线谱');
+  assert.equal(pageIndex(), '0', '初始停在主页面');
+  assert.ok(pages.children[0].classList.contains('is-active'), '主页面是当前页');
+
+  panelElement.dispatchEvent('click', { target: settingsRow('staff-settings') });
+  assert.equal(pageIndex(), '2', '「五线谱设置」应翻到第三张');
+  assert.ok(pages.children[2].classList.contains('is-active'), '五线谱子页成为当前页');
+  assert.ok(!pages.children[0].classList.contains('is-active'), '主页面不再是当前页');
+
+  panelElement.dispatchEvent('click', { target: backButton() });
+  assert.equal(pageIndex(), '0', '返回键回主页面');
+  assert.ok(pages.children[0].classList.contains('is-active'));
+
+  panelElement.dispatchEvent('click', { target: settingsRow('pedal-settings') });
+  assert.equal(pageIndex(), '1', '「踏板设置」仍是第二张');
+  panelElement.dispatchEvent('click', { target: backButton() });
+  assert.equal(pageIndex(), '0');
+});
+
+test('五线谱总开关：关掉时子选项只是变暗，照样在（不消失、不塌陷）', () => {
+  resetAll();
+  clearStaff();
+
+  const options = el('staff-options');
+  assert.ok(!options.classList.contains('is-dim'), '默认不变暗');
+
+  el('staff-toggle').checked = false;
+  el('staff-toggle').dispatchEvent('change');
+  assert.ok(options.classList.contains('is-dim'), '关掉总开关后子选项变暗');
+  // 变暗 ≠ 消失：元素还在，谱号选择也没被禁用（只是点不动）
+  assert.equal(el('clef-select').value, 'treble', '子选项内容保持不变');
+  assert.equal(el('clef-select').disabled, false, '变暗不该等同于禁用');
+  assert.ok(!el('clef-select').classList.contains('is-hidden'), '子选项不隐藏');
+
+  el('staff-toggle').checked = true;
+  el('staff-toggle').dispatchEvent('change');
+  assert.ok(!options.classList.contains('is-dim'), '打开后恢复变亮');
+});
+
+test('五线谱谱号：换谱号后音符跟着重新落位', () => {
+  resetAll();
+
+  const paths = () => collectByClass(appStaff().svg, 'clef-path').length;
+  const fills = () => collectByClass(appStaff().svg, 'clef-fill').length;
+
+  // 高音谱号：C4 是下加一线（最下面那条线下面一个线距）
+  assert.equal(yOf(60), STAFF_BOTTOM_Y + STAFF_SPACE, '高音谱号下 C4 的位置');
+  assert.equal(paths(), 1, '高音谱号一笔画完');
+  assert.equal(fills(), 0);
+
+  // 低音谱号：最上面那条线是 A3，C4 落在它的上加一线
+  pickClef('bass');
+  assert.equal(appStaff().snapshot().clef, 'bass');
+  assert.equal(yOf(60), STAFF_TOP_Y - STAFF_SPACE, '低音谱号下 C4 的位置');
+  assert.equal(collectByClass(appStaff().svg, 'staff-line').length, 5, '仍然只有一条谱表');
+  assert.equal(paths(), 1, '低音谱号一个大弯');
+  assert.equal(fills(), 2, '低音谱号右边两个点');
+
+  // 中音谱号：中间那条线就是 C4
+  pickClef('alto');
+  assert.equal(yOf(60), STAFF_TOP_Y + STAFF_SPACE * 2, '中音谱号下 C4 在中间那条线');
+  assert.equal(paths(), 2, '中音谱号左右两条括号');
+  assert.equal(fills(), 1, '中音谱号中央一个实心块');
+
+  // 换回高音谱号，位置也回到原来那套
+  pickClef('treble');
+  assert.equal(yOf(64), STAFF_BOTTOM_Y, '高音谱号下 E4 在最下面那条线');
+  assert.equal(collectByClass(appStaff().svg, 'clef-path').length, 1, '只有一个谱号');
+
+  clearStaff();
+});
+
+test('五线谱双声部：自动分谱表，每个音只画一次', () => {
+  resetAll();
+  clearStaff();
+
+  setGrand(true);
+  assert.ok(document.body.classList.contains('grand-staff'), '页面进入双声部布局');
+  assert.equal(appStaff().snapshot().grand, true);
+  assert.equal(appStaff().snapshot().height, 360, '双声部谱面更高');
+  assert.deepEqual(
+    appStaff().snapshot().staves.map(staff => staff.clef).join(' , '),
+    'treble , bass',
+    '上高音、下低音',
+  );
+  assert.equal(collectByClass(appStaff().svg, 'staff-line').length, 10, '两条谱表共十条线');
+
+  // 左手 C3 + 右手 C 大三和弦：低音单独下去，和弦整块留在高音谱表
+  press(1, 48); press(2, 60); press(3, 64); press(4, 67);
+  assert.equal(staffNotes().join(' , '), '48 , 60 , 64 , 67');
+
+  const staves = appStaff().snapshot().staves;
+  assert.equal(staves[0].notes.join(' , '), '60 , 64 , 67', '右手三和弦整块留在高音谱表');
+  assert.equal(staves[1].notes.join(' , '), '48', '左手低音落到低音谱表');
+  assert.equal(
+    staves.reduce((sum, staff) => sum + staff.notes.length, 0),
+    4,
+    '四个音各归一条谱表，不重不漏',
+  );
+
+  const ys = collectByClass(appStaff().svg, 'note-head')
+    .map(head => Number.parseFloat(head.getAttribute('cy')))
+    .sort((a, b) => a - b);
+  assert.equal(ys.length, 4, '四个音各画一个符头，没有重复');
+  assert.equal(ys.map(Math.round).join(' , '), '132 , 148 , 164 , 252', '高音谱表三个音 + 低音谱表一个音');
+  assert.ok(
+    ys.filter(y => y >= staves[0].lines[0] - 32 && y <= staves[0].lines[1] + 32).length === 3,
+    '三个音画在高音谱表附近',
+  );
+  assert.ok(
+    ys.filter(y => y >= staves[1].lines[0] && y <= staves[1].lines[1]).length === 1,
+    '低音画在低音谱表的五条线之内',
+  );
+
+  releaseAll();
+  clearStaff();
+
+  // 单独一个低音和弦：整块留在低音谱表，不被拆开
+  press(1, 48); press(2, 52); press(3, 55);
+  assert.equal(appStaff().snapshot().staves[0].notes.length, 0, '高音谱表空着');
+  assert.equal(appStaff().snapshot().staves[1].notes.join(' , '), '48 , 52 , 55', '低音和弦不被拆开');
+  const lowYs = collectByClass(appStaff().svg, 'note-head')
+    .map(head => Number.parseFloat(head.getAttribute('cy')));
+  assert.equal(lowYs.length, 3);
+  assert.ok(lowYs.every(y => y >= 212 && y <= 276), 'C3 的完整三和弦整块在低音谱表');
+  releaseAll();
+  clearStaff();
+
+  // 单独一个高音和弦：整块留在高音谱表，不会掉到低音谱表去
+  press(1, 72); press(2, 76); press(3, 79);
+  assert.equal(appStaff().snapshot().staves[0].notes.join(' , '), '72 , 76 , 79');
+  assert.equal(appStaff().snapshot().staves[1].notes.length, 0);
+  releaseAll();
+  clearStaff();
+
+  setGrand(false);
+  assert.ok(!document.body.classList.contains('grand-staff'));
+  assert.equal(appStaff().snapshot().height, 296, '关掉后回到单谱表高度');
+  assert.equal(collectByClass(appStaff().svg, 'staff-line').length, 5);
+});
+
+test('五线谱双声部：锁住谱号选择（固定高音），关掉后恢复原谱号', () => {
+  resetAll();
+  clearStaff();
+
+  pickClef('bass');
+  assert.equal(appStaff().snapshot().clef, 'bass');
+
+  setGrand(true);
+  assert.ok(el('clef-setting').classList.contains('is-locked'), '双声部时谱号行锁住');
+  assert.equal(el('clef-select').disabled, true, '下拉框被禁用');
+  assert.equal(el('clef-select').value, 'bass', '锁住时不清空已选的值');
+  assert.equal(appStaff().snapshot().clef, 'treble', '双声部上谱表固定高音谱号');
+
+  setGrand(false);
+  assert.ok(!el('clef-setting').classList.contains('is-locked'), '关掉双声部后解锁');
+  assert.equal(el('clef-select').disabled, false);
+  assert.equal(appStaff().snapshot().clef, 'bass', '原来的谱号原样回来');
+
   clearStaff();
 });

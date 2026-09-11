@@ -59,11 +59,6 @@
           </div>
 
           <div class="setting-item">
-            <label for="staff-toggle">显示五线谱</label>
-            <input type="checkbox" id="staff-toggle" checked>
-          </div>
-
-          <div class="setting-item">
             <label for="chord-toggle">识别和弦</label>
             <input type="checkbox" id="chord-toggle" checked>
           </div>
@@ -76,6 +71,13 @@
           <div class="setting-item has-sub" data-sub="pedal-settings">
             <label>踏板设置</label>
             <button class="sub-btn" id="pedal-sub-btn" type="button" aria-label="进入踏板设置">
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+
+          <div class="setting-item has-sub" data-sub="staff-settings">
+            <label>五线谱设置</label>
+            <button class="sub-btn" id="staff-sub-btn" type="button" aria-label="进入五线谱设置">
               <span aria-hidden="true">→</span>
             </button>
           </div>
@@ -103,6 +105,40 @@
           <div class="setting-item">
             <label for="toggle-pedal-toggle">踏板切换</label>
             <input type="checkbox" id="toggle-pedal-toggle">
+          </div>
+
+        </div>
+
+        <div class="page sub" id="sub-staff-settings">
+          <div class="sub-header">
+            <button class="back-btn" id="staff-back-btn" type="button" aria-label="返回">
+              <span aria-hidden="true">←</span>
+            </button>
+            <h2>五线谱设置</h2>
+          </div>
+
+          <div class="setting-item">
+            <label for="staff-toggle">开启五线谱</label>
+            <input type="checkbox" id="staff-toggle" checked>
+          </div>
+
+          <!-- 总开关关掉时整块变暗（但不消失、不移位），打开时恢复 -->
+          <div class="staff-options" id="staff-options">
+
+            <div class="setting-item staff-option" id="clef-setting">
+              <label for="clef-select">默认谱号</label>
+              <select id="clef-select">
+                <option value="treble" selected>高音谱号</option>
+                <option value="alto">中音谱号</option>
+                <option value="bass">低音谱号</option>
+              </select>
+            </div>
+
+            <div class="setting-item staff-option">
+              <label for="grand-toggle">开启双声部</label>
+              <input type="checkbox" id="grand-toggle">
+            </div>
+
           </div>
 
         </div>

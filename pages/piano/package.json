@@ -4,6 +4,6 @@
   "description": "虚拟钢琴：浏览器内的多波形键盘、踏板延音与和弦 / 转位识别",
   "scripts": {
     "test": "node --test tests",
-    "test:single": "node --test --test-isolation=none \"tests/*.test.mjs\""
+    "test:single": "node tests/chords.test.mjs && node tests/integration.test.mjs && node tests/project.test.mjs"
   }
 }

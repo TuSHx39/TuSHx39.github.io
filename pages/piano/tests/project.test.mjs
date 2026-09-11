@@ -139,7 +139,10 @@ test('脚本切换的界面类都在 CSS 里有定义', () => {
     'is-down',          // 琴键按下
     'show',             // 次级设置展开
     'open',             // 设置面板展开
-    'show-sub',         // 子页滑动
+    'is-active',        // 设置子页当前页
+    'is-dim',           // 五线谱总开关关掉时子选项变暗
+    'is-locked',        // 双声部时锁住谱号选择
+    'grand-staff',      // 双声部：谱面加高
     'active',           // 齿轮旋转
     'sustain-on',       // 延音状态
     'pedal-hidden',     // 隐藏踏板
@@ -176,7 +179,7 @@ test('五线谱：容器、开关、SVG 样式都在', () => {
 
   // staff.js 画出来的每个 class 都要有样式
   for (const className of [
-    'staff-svg', 'staff-line', 'staff-ledger', 'clef-path',
+    'staff-svg', 'staff-line', 'staff-ledger', 'clef-path', 'clef-fill',
     'note-head', 'staff-accidental',
   ]) {
     assert.ok(css.includes(`.${className}`), `CSS 缺少 .${className}`);
@@ -224,6 +227,8 @@ test('保留了原来的设置项，并新增键位标注开关与 piano 波形'
     'pedal-toggle',
     'invert-pedal-toggle',
     'toggle-pedal-toggle',
+    'clef-select',
+    'grand-toggle',
   ];
   for (const id of required) {
     assert.ok(html.includes(`id="${id}"`), `设置项 #${id} 丢失`);
@@ -237,6 +242,51 @@ test('保留了原来的设置项，并新增键位标注开关与 piano 波形'
   const mainJs = readFileSync(join(jsDir, 'main.js'), 'utf8');
   assert.match(mainJs, /waveform:\s*'piano'/, 'main.js 的默认波形应为 piano');
   assert.match(mainJs, /showKeyHints:\s*true/, '键位标注默认开启');
+});
+
+test('五线谱设置单独成页：总开关 + 变暗但不消失的子选项', () => {
+  // 主页面最后一行是入口，指向 sub-staff-settings
+  assert.match(html, /data-sub="staff-settings"/, '主设置里缺少「五线谱设置」入口');
+  assert.match(html, /id="sub-staff-settings"/, '缺少五线谱子页容器');
+  assert.match(html, /id="staff-back-btn"/, '缺少返回按钮');
+
+  // 主页面里不再直接放五线谱开关（总开关挪进子页第一项）
+  const mainPage = html.slice(html.indexOf('class="page main"'), html.indexOf('id="sub-pedal-settings"'));
+  assert.ok(!/id="staff-toggle"/.test(mainPage), '总开关应挪到子页里');
+
+  const staffPage = html.slice(html.indexOf('id="sub-staff-settings"'), html.indexOf('</body>'));
+  assert.match(staffPage, /for="staff-toggle">开启五线谱/, '子页第一项应是总开关');
+  assert.ok(
+    staffPage.indexOf('id="staff-toggle"') < staffPage.indexOf('id="clef-select"'),
+    '总开关要排在子选项前面',
+  );
+
+  // 三个谱号，顺序与取值固定
+  const clefs = matchAll(staffPage, /<option value="(\w+)"/g);
+  assert.deepEqual(clefs, ['treble', 'alto', 'bass'], '谱号选项应为 高音 / 中音 / 低音');
+  assert.match(staffPage, /<option value="treble" selected>/, '默认高音谱号');
+  for (const label of ['高音谱号', '中音谱号', '低音谱号']) {
+    assert.ok(staffPage.includes(label), `缺少谱号选项「${label}」`);
+  }
+  assert.match(staffPage, /for="grand-toggle">开启双声部/, '缺少双声部开关');
+
+  // 子选项整块挂在 #staff-options 里，靠 .is-dim 变暗：不能有 display:none / 塌陷
+  assert.match(html, /id="staff-options"/, '缺少子选项容器');
+  const dim = css.match(/\.staff-options\.is-dim\s*\{[^}]*\}/);
+  assert.ok(dim, 'CSS 缺少 .staff-options.is-dim');
+  assert.match(dim[0], /opacity/, '变暗要用透明度');
+  assert.ok(!/display:\s*none|visibility:\s*hidden|max-height:\s*0/.test(dim[0]), '变暗不等于消失');
+
+  // 面板里现在是三张页，翻页靠 --page-index
+  const pagesRule = css.match(/\.settings-pages\s*\{[^}]*\}/)[0];
+  assert.match(pagesRule, /width:\s*300%/, '三张页要平铺 300% 宽');
+  assert.match(pagesRule, /--page-index/, '翻页应由 --page-index 驱动');
+  assert.ok(!/show-sub/.test(css), 'show-sub 已被 --page-index 取代');
+  assert.match(css, /\.page\.is-active\s*\{/, '当前页应有 .is-active 样式');
+
+  // 双声部：谱号锁住 + 谱面加高
+  assert.match(css, /\.staff-option\.is-locked\s*\{/, '双声部时要能锁住谱号行');
+  assert.match(css, /body\.grand-staff\s*\{[^}]*--score-height:\s*360px/, '双声部谱面要加高到 360px');
 });
 
 test('复合和弦逻辑与设置项已经删干净', () => {

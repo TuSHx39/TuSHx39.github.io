@@ -20,6 +20,7 @@ const FIRST_MIDI = 21;  // A0
 const LAST_MIDI = 108;  // C8
 const MAX_ALTERNATIVES = 4;
 const WAVEFORMS = ['piano', 'triangle', 'sine', 'square', 'sawtooth'];
+const CLEFS = ['treble', 'alto', 'bass'];
 const loadSettings = (Piano.Store && Piano.Store.loadSettings) || (() => ({}));
 
 const DEFAULTS = {
@@ -29,6 +30,8 @@ const DEFAULTS = {
   showNoteName: true,
   showKeyHints: true,
   showStaff: true,
+  staffClef: 'treble',
+  staffGrand: false,
   showChord: true,
   allowInversion: true,
   showPedal: true,
@@ -59,6 +62,10 @@ function collectElements() {
   el.noteNameToggle = document.getElementById('note-name-toggle');
   el.keyHintToggle = document.getElementById('key-hint-toggle');
   el.staffToggle = document.getElementById('staff-toggle');
+  el.staffOptions = document.getElementById('staff-options');
+  el.clefSelect = document.getElementById('clef-select');
+  el.clefSetting = document.getElementById('clef-setting');
+  el.grandToggle = document.getElementById('grand-toggle');
   el.scoreSheet = document.getElementById('score-sheet');
   el.chordToggle = document.getElementById('chord-toggle');
   el.inversionToggle = document.getElementById('inversion-toggle');
@@ -83,8 +90,6 @@ function setSustain(on) {
   sustainOn = next;
   el.body.classList.toggle('sustain-on', next);
   synth.setSustain(next);
-  // 抬踏板：五线谱先留着，下一次演奏时才清空
-  if (!next && staff) staff.pedalReleased();
   scheduleRefresh();
 }
 
@@ -120,22 +125,16 @@ let keyboard = null;
 let panel = null;
 let staff = null;
 
-/** 实际按着（琴键 / 电脑键盘）的音：五线谱用它判断「同一个和弦」 */
-const heldKeys = new Set();
-
-/** 弹一个音：发声 + 记谱 */
+/** 弹一个音：发声（五线谱由 refreshDisplay 统一刷新） */
 function playNote(midi) {
   synth.resume();
   synth.noteOn(midi);
-  heldKeys.add(midi);
-  if (staff) staff.pushNote(midi, { spelling: spellingHints.get(midi) });
   scheduleRefresh();
 }
 
 /** 松开一个音 */
 function endNote(midi) {
   synth.noteOff(midi);
-  heldKeys.delete(midi);
   scheduleRefresh();
 }
 
@@ -154,11 +153,7 @@ function setup() {
     onVoicesChanged: () => scheduleRefresh(),
   });
 
-  staff = Piano.Staff.createStaff({
-    container: el.scoreSheet,
-    isHeld: midi => heldKeys.has(midi),
-    isSustain: () => sustainOn,
-  });
+  staff = Piano.Staff.createStaff({ container: el.scoreSheet });
 
   keyboard = Piano.Keyboard.createKeyboard({
     container: el.piano,
@@ -169,7 +164,6 @@ function setup() {
     onNoteOff: midi => endNote(midi),
     onPointerUp: () => {
       synth.releaseAllHeld();
-      heldKeys.clear();
       scheduleRefresh();
     },
     onInteract: () => synth.resume(),
@@ -195,6 +189,9 @@ function scheduleRefresh() {
 
 function refreshDisplay() {
   const notes = synth.sounding();
+
+  // 五线谱直接画这一份数据：留存的音 = 此刻还在响的音，和「当前音」永远一致
+  if (staff) staff.setNotes(notes, spellingHints);
 
   const analysis = state.showChord
     ? analyzeChord(notes, {
@@ -264,6 +261,8 @@ function applySettingsToControls() {
   el.noteNameToggle.checked = Boolean(state.showNoteName);
   el.keyHintToggle.checked = Boolean(state.showKeyHints);
   el.staffToggle.checked = Boolean(state.showStaff);
+  if (CLEFS.includes(state.staffClef)) el.clefSelect.value = state.staffClef;
+  el.grandToggle.checked = Boolean(state.staffGrand);
   el.chordToggle.checked = Boolean(state.showChord);
   el.inversionToggle.checked = Boolean(state.allowInversion);
   el.pedalToggle.checked = Boolean(state.showPedal);
@@ -279,7 +278,19 @@ function applyUiState() {
   if (!state.showChord) el.chordAltEl.classList.add('is-hidden');
   keyboard.setLabelsVisible(state.showNoteName);
   keyboard.setHintsVisible(state.showKeyHints);
-  if (staff) staff.setVisible(state.showStaff);
+
+  // 五线谱：开关只控制显隐；谱号与双声部改的是排版，交给 staff 自己重算
+  const grand = Boolean(state.staffGrand);
+  if (staff) {
+    staff.setVisible(state.showStaff);
+    staff.setClef(grand ? 'treble' : state.staffClef);
+    staff.setGrandStaff(grand);
+  }
+  el.body.classList.toggle('grand-staff', grand);
+  // 总开关关掉时子选项变暗但不消失；双声部时谱号固定高音，锁住选择
+  el.staffOptions.classList.toggle('is-dim', !state.showStaff);
+  el.clefSetting.classList.toggle('is-locked', grand);
+  el.clefSelect.disabled = grand;
 
   const showChordSub = Boolean(state.showChord);
   el.inversionSetting.classList.toggle('show', showChordSub);
@@ -331,6 +342,20 @@ function bindControls() {
 
   el.staffToggle.addEventListener('change', () => {
     state.showStaff = el.staffToggle.checked;
+    applyUiState();
+    persist();
+  });
+
+  el.clefSelect.addEventListener('change', () => {
+    const value = el.clefSelect.value;
+    if (!CLEFS.includes(value)) return;
+    state.staffClef = value;
+    applyUiState();
+    persist();
+  });
+
+  el.grandToggle.addEventListener('change', () => {
+    state.staffGrand = el.grandToggle.checked;
     applyUiState();
     persist();
   });
@@ -469,7 +494,6 @@ function bindPedal() {
     keyboard.clearPressed();
     computerKeys.clear();
     spellingHints.clear();
-    heldKeys.clear();
     pedalPressed = false;
     pedalPointerId = null;
     spacePressed = false;
