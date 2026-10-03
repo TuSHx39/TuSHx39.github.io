@@ -1,235 +1,127 @@
 /**
- * minsteps.js —— 可中断的「精确最短步数」计算器。
- *
- * 算法：迭代加深 + 显式栈（所以可以随时暂停 / 继续，不会阻塞页面）。
- *   · 下界从「颜色数-1」起步（每步最多消掉一种颜色，这是合法下界）；
- *   · 对当前深度 d 做一次完整 DFS：搜完仍无解 → 说明最短步数 > d，
- *     已证下界提升到 d+1，再加深一层；一旦找到解，那个 d 就是**确切的最短步数**
- *     （因为更短的深度已经被完整排除过了）。
- *   · 剪枝：同状态去重（记录「该局面在剩余 r 步内已证无解」）+ 下界剪枝。
- *
- * step(budgetMs) 每次只算一小片（默认 10ms），由调用方用 setTimeout 反复驱动，
- * 所以玩家可以边算边玩、也可以随时停。
- *
- * 传统脚本（非 ES Module），接口挂在全局 Yicai.MinSteps 上。
+ * 精确最短步数：初始连通块压缩图 + 迭代加深 + 可暂停的记忆化计数。
+ * 区域只会整体变色或合并，搜索规模由色块数量决定。完整状态编码避免碰撞。
  */
-
 (function (global) {
   'use strict';
-
   const Yicai = (global.Yicai = global.Yicai || {});
+  const nowMs = () => typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-  function nowMs() {
-    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-      return performance.now();
-    }
-    return Date.now();
-  }
-
-  /**
-   * 建一个计算任务。
-   * @param {object} board 题目初始盘面
-   * @param {number} target 目标颜色
-   * @param {object} [options] {maxDepth, visitedCap}
-   * @returns {object} job：{state, step(ms), stop()}
-   */
   function createJob(board, target, options) {
-    const Core = Yicai.Core;
     const Solver = Yicai.Solver;
     const opts = options || {};
-    const n = board.cells.length;
-    const maxDepth = opts.maxDepth == null ? 40 : opts.maxDepth;
-    const visitedCap = opts.visitedCap == null ? 300000 : opts.visitedCap;
-    /** 找到最优解后是否继续数「最优解的个数」（唯一解判定）。默认关闭，行为与以前一致 */
-    const countOptimal = !!opts.countOptimal;
-    const adj = Core.buildAdjacency(board);
-    const work = Int8Array.from(board.cells);
-    const buf = Solver.createBuffer(n);
-    const visited = new Map();
-
-    // 非目标色格子数：增量维护，用来 O(1) 判断「是否已经全部染成目标色」
-    let nonTarget = 0;
-    for (let i = 0; i < n; i++) {
-      const v = work[i];
-      if (v !== Core.HOLE && v !== target) nonTarget++;
-    }
-
+    const maxDepth = Math.max(0, Math.floor(opts.maxDepth == null ? 40 : opts.maxDepth));
+    const visitedCap = Math.max(0, opts.visitedCap == null ? 300000 : opts.visitedCap);
+    const countCap = opts.countOptimal ? 2 : 1;
+    const graph = Solver.createRegionGraph(board);
+    const work = Int8Array.from(graph.cells);
+    const buf = Solver.createBuffer(work.length);
+    const memo = new Map();
+    const dead = new Map();
+    const path = [];
+    const stack = [];
+    Solver.analyzeInto(work, graph.adj, buf);
+    const lower = Solver.lowerBoundOf(buf, target);
     const state = {
-      status: 'running', // running | done | stopped
-      exact: null,
-      provenLower: 0, // 已证明：最短步数 ≥ provenLower
-      depth: 0, // 正在验证的深度
+      status: lower === 0 ? 'done' : lower > maxDepth ? 'stopped' : 'running',
+      exact: lower === 0 ? 0 : null,
+      provenLower: lower,
+      depth: lower,
       nodes: 0,
       elapsed: 0,
-      solution: null,
-      /** 开了 countOptimal 时：最优解的个数（封顶 2；1 = 唯一解，2 = 多解） */
-      optimalCount: null,
+      solution: lower === 0 ? [] : null,
+      optimalCount: lower === 0 && opts.countOptimal ? 1 : null,
+      regions: work.length,
     };
 
-    Solver.analyzeInto(work, adj, buf);
-    state.provenLower = Solver.lowerBoundOf(buf, target);
-    state.depth = state.provenLower;
-
-    let stack = [];
-    let path = [];
-    let currentDepth = state.provenLower;
-    let solutions = 0;
-    let firstSolution = null;
-
-    function prepareCandidates() {
-      return Solver.listCandidates(work, adj, buf, target).map((cand) => ({
-        index: cand.index,
-        color: cand.color,
-        prevColor: buf.color[cand.cid],
-        ownCells: buf.flat.slice(buf.offset[cand.cid], buf.offset[cand.cid + 1]),
-      }));
+    function pushFrame(remaining, entry) {
+      stack.push({ remaining, entry, key: Solver.hashState(work), candidates: null, idx: 0, count: 0 });
     }
+    if (state.status === 'running') pushFrame(lower, null);
 
-    function applyMove(move) {
-      for (let p = 0; p < move.ownCells.length; p++) work[move.ownCells[p]] = move.color;
-      if (move.prevColor !== target) nonTarget -= move.ownCells.length;
-      if (move.color !== target) nonTarget += move.ownCells.length;
-      path.push({ index: move.index, color: move.color });
+    function apply(move) {
+      for (const i of move.ownCells) work[i] = move.color;
+      path.push({ index: graph.representatives[move.index], color: move.color });
     }
-
-    function undoMove(move) {
+    function undo(move) {
       if (!move) return;
-      for (let p = 0; p < move.ownCells.length; p++) work[move.ownCells[p]] = move.prevColor;
-      if (move.color !== target) nonTarget -= move.ownCells.length;
-      if (move.prevColor !== target) nonTarget += move.ownCells.length;
+      for (const i of move.ownCells) work[i] = move.prevColor;
       path.pop();
     }
-
-    /** 从根局面开始验证 depth 步内是否有解 */
-    function startDepth(depth) {
-      stack = [];
-      path = [];
-      Solver.analyzeInto(work, adj, buf);
-      stack.push({
-        remaining: depth,
-        candidates: prepareCandidates(),
-        idx: 0,
-        entry: null,
-        key: Solver.hashState(work),
-        hasSolution: false,
-      });
-      state.depth = depth;
+    function cache(map, key, value) {
+      if (memo.size + dead.size < visitedCap || map.has(key)) map.set(key, value);
     }
 
-    if (nonTarget === 0) {
-      state.status = 'done';
-      state.exact = 0;
-      state.solution = [];
-      state.optimalCount = countOptimal ? 1 : null;
-    } else {
-      startDepth(currentDepth);
+    // 每条到达缓存状态的路径都累加计数，避免把多解误判为唯一解。
+    function complete(count) {
+      const frame = stack.pop();
+      cache(memo, frame.key + '|' + frame.remaining, count);
+      if (count === 0) cache(dead, frame.key, Math.max(dead.get(frame.key) || 0, frame.remaining));
+      undo(frame.entry);
+      if (stack.length) {
+        const parent = stack[stack.length - 1];
+        parent.count = Math.min(countCap, parent.count + count);
+      } else if (count > 0) {
+        state.status = 'done';
+        state.provenLower = state.exact = state.depth;
+        state.optimalCount = opts.countOptimal ? count : null;
+      } else {
+        state.provenLower = ++state.depth;
+        if (state.depth > maxDepth) state.status = 'stopped';
+        else pushFrame(state.depth, null);
+      }
     }
 
-    /**
-     * 算一小片。
-     * @param {number} [budgetMs] 这一片最多占用多少毫秒（默认 10）
-     * @returns {boolean} 是否还需要继续算
-     */
     function step(budgetMs) {
       if (state.status !== 'running') return false;
       const started = nowMs();
-      const deadline = started + (budgetMs == null ? 10 : budgetMs);
-      let guard = 0;
-
+      const budget = Math.max(0, budgetMs == null ? 10 : budgetMs);
+      let operations = 0;
       while (state.status === 'running') {
-        // 每 64 个节点看一次时间，避免频繁调用计时器
-        if ((++guard & 63) === 0 && nowMs() > deadline) break;
-
-        if (!stack.length) {
-          if (solutions > 0) {
-            // 当前深度的解已经全部数完：这个深度就是最短步数
-            state.exact = currentDepth;
-            state.solution = firstSolution;
-            state.optimalCount = countOptimal ? Math.min(solutions, 2) : null;
-            state.status = 'done';
-            break;
-          }
-          // 这一层搜完还是没有解 → 最短步数至少是「这个深度 + 1」
-          state.provenLower = currentDepth + 1;
-          state.solution = null;
-          if (state.provenLower > maxDepth) {
-            state.status = 'stopped';
-            break;
-          }
-          currentDepth = state.provenLower;
-          startDepth(currentDepth);
-          continue;
-        }
-
+        if ((operations++ & 15) === 0 && nowMs() - started >= budget) break;
         const frame = stack[stack.length - 1];
-        if (frame.idx >= frame.candidates.length) {
-          // 子树里出现过解的帧不能记成「死状态」，否则会漏数最优解
-          if (!frame.hasSolution && visited.size < visitedCap) {
-            visited.set(frame.key, frame.remaining);
+        if (!frame.candidates) {
+          const cached = memo.get(frame.key + '|' + frame.remaining);
+          if (cached !== undefined) { complete(cached); continue; }
+          if ((dead.get(frame.key) ?? -1) >= frame.remaining) { complete(0); continue; }
+          Solver.analyzeInto(work, graph.adj, buf);
+          const bound = Solver.lowerBoundOf(buf, target);
+          if (bound === 0) {
+            if (!state.solution) {
+              state.solution = path.slice();
+              state.exact = state.provenLower = state.depth;
+            }
+            complete(1);
+            continue;
           }
-          stack.pop();
-          undoMove(frame.entry);
-          continue;
+          if (frame.remaining <= 0 || bound > frame.remaining) { complete(0); continue; }
+          const members = new Map();
+          frame.candidates = Solver.listCandidates(work, graph.adj, buf, target).map((cand) => {
+            if (!members.has(cand.cid)) members.set(cand.cid, buf.flat.slice(buf.offset[cand.cid], buf.offset[cand.cid + 1]));
+            return {
+              index: cand.index, color: cand.color, prevColor: buf.color[cand.cid],
+              ownCells: members.get(cand.cid),
+            };
+          });
         }
-
-        const cand = frame.candidates[frame.idx++];
-        applyMove(cand);
+        if (frame.count >= countCap || frame.idx === frame.candidates.length) { complete(frame.count); continue; }
+        const move = frame.candidates[frame.idx++];
+        apply(move);
         state.nodes++;
-
-        if (nonTarget === 0) {
-          solutions++;
-          if (!firstSolution) firstSolution = path.slice();
-          state.exact = currentDepth;
-          state.solution = firstSolution;
-          for (let s = 0; s < stack.length; s++) stack[s].hasSolution = true;
-          if (!countOptimal || solutions >= 2) {
-            state.optimalCount = countOptimal ? Math.min(solutions, 2) : null;
-            state.status = 'done';
-            break;
-          }
-          // 开了唯一性统计：退回来继续在同一个深度上找第二个解
-          undoMove(cand);
-          continue;
-        }
-        if (frame.remaining - 1 <= 0) {
-          undoMove(cand);
-          continue;
-        }
-        const key = Solver.hashState(work);
-        const seen = visited.get(key);
-        if (seen !== undefined && seen >= frame.remaining - 1) {
-          undoMove(cand);
-          continue;
-        }
-        Solver.analyzeInto(work, adj, buf);
-        if (Solver.lowerBoundOf(buf, target) > frame.remaining - 1) {
-          if (visited.size < visitedCap) visited.set(key, frame.remaining - 1);
-          undoMove(cand);
-          continue;
-        }
-        stack.push({
-          remaining: frame.remaining - 1,
-          candidates: prepareCandidates(),
-          idx: 0,
-          entry: cand,
-          key,
-          hasSolution: false,
-        });
+        pushFrame(frame.remaining - 1, move);
       }
-
       state.elapsed += nowMs() - started;
       return state.status === 'running';
     }
 
     function stop() {
       if (state.status === 'running') state.status = 'stopped';
-      // 把棋盘恢复成初始局面
-      while (stack.length) undoMove(stack.pop().entry);
+      while (stack.length) undo(stack.pop().entry);
+      memo.clear();
+      dead.clear();
       return state;
     }
-
     return { state, step, stop };
   }
-
   Yicai.MinSteps = { createJob };
 })(typeof window !== 'undefined' ? window : globalThis);

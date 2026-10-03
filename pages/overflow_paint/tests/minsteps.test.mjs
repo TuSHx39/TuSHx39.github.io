@@ -9,6 +9,67 @@ const Generator = Yicai.Generator;
 const Solver = Yicai.Solver;
 const MinSteps = Yicai.MinSteps;
 
+test('minsteps：零步预算不能返回一步解', () => {
+  const board = Core.deserialize('0011', 2, 2);
+  const state = runToEnd(MinSteps.createJob(board, 1, { maxDepth: 0 }));
+  assert.equal(state.status, 'stopped');
+  assert.equal(state.exact, null);
+  assert.equal(state.solution, null);
+});
+
+test('minsteps：大面积同色块压缩后仍给出原棋盘上的合法解', () => {
+  const board = Core.createBoard(15, 20, 0);
+  for (let i = 0; i < board.cells.length; i++) if (i % 20 >= 10) board.cells[i] = 1;
+  const state = runToEnd(MinSteps.createJob(board, 1, { countOptimal: true }));
+  assert.equal(state.regions, 2);
+  assert.equal(state.exact, 1);
+  assert.equal(state.optimalCount, 1);
+  assert.equal(Core.simulate(board, state.solution, 1).solved, true);
+});
+
+test('minsteps：所有 2×2 四色盘面与独立广度搜索的步数及计数一致', () => {
+  // 广度搜索逐层累计路径数，独立验证压缩图和记忆化计数（封顶 2）。
+  function breadthFirst(board, target) {
+    let frontier = new Map([[Core.serialize(board), { board, count: 1 }]]);
+    const seen = new Set(frontier.keys());
+    for (let depth = 0; depth <= 4; depth++) {
+      let solved = 0;
+      for (const item of frontier.values()) if (Core.isSolved(item.board, target)) solved += item.count;
+      if (solved) return { depth, count: Math.min(2, solved) };
+      const next = new Map();
+      for (const item of frontier.values()) {
+        for (const comp of Core.componentList(item.board)) {
+          for (let color = 0; color < 4; color++) {
+            if (color === comp.color) continue;
+            const moved = Core.cloneBoard(item.board);
+            Core.applyColor(moved, comp.cells, color);
+            const key = Core.serialize(moved);
+            if (seen.has(key)) continue;
+            const entry = next.get(key);
+            if (entry) entry.count = Math.min(2, entry.count + item.count);
+            else next.set(key, { board: moved, count: item.count });
+          }
+        }
+      }
+      for (const key of next.keys()) seen.add(key);
+      frontier = next;
+    }
+    throw new Error('2×2 盘面应在 4 步内解出');
+  }
+  for (let pattern = 0; pattern < 256; pattern++) {
+    const board = Core.createBoard(2, 2, 0);
+    for (let i = 0; i < 4; i++) board.cells[i] = (pattern >> (i * 2)) & 3;
+    for (let target = 0; target < 4; target++) {
+      const expected = breadthFirst(board, target);
+      const state = runToEnd(MinSteps.createJob(board, target, { maxDepth: 4, countOptimal: true }));
+      assert.equal(state.status, 'done');
+      assert.equal(state.exact, expected.depth, `盘面 ${pattern}，目标 ${target}`);
+      assert.equal(state.optimalCount, expected.count, `盘面 ${pattern}，目标 ${target} 的计数`);
+      assert.equal(Core.simulate(board, state.solution, target).solved, true);
+    }
+  }
+});
+
 /** 一直算到结束（分片驱动，模拟页面里的 setTimeout 循环） */
 function runToEnd(job, sliceMs = 4, guard = 20000) {
   let n = 0;

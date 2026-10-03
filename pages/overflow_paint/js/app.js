@@ -22,7 +22,7 @@
   const EXTRA_CAP = 15;
   const DEMO_INTERVAL = 380;
   /** 最短步数计算每一片最多占用的毫秒数（越小越不影响操作） */
-  const MINSTEPS_SLICE = 10;
+  const MINSTEPS_SLICE = 6;
   /** 两片之间让出多少毫秒，避免一直占着主线程 */
   const MINSTEPS_DELAY = 8;
 
@@ -394,7 +394,7 @@
       return;
     }
     minStepsJob = MinSteps.createJob(state.puzzle.board, state.puzzle.target, {
-      maxDepth: 40,
+      maxDepth: state.puzzle.solution.length,
       countOptimal: true, // 顺带数出「最优解有几个」，用来标唯一解 / 多解
     });
     state.minSteps = snapshotMinSteps(minStepsJob.state);
@@ -442,12 +442,6 @@
     render();
   }
 
-  function formatNodes(nodes) {
-    if (nodes >= 1e8) return (nodes / 1e8).toFixed(2) + ' 亿';
-    if (nodes >= 1e4) return (nodes / 1e4).toFixed(1) + ' 万';
-    return String(nodes);
-  }
-
   /** 题目「唯一解 / 多解」的标识（出题时的判定，未验证时返回 null） */
   function uniqueLabel() {
     if (!state.puzzle) return null;
@@ -487,25 +481,9 @@
     }
     if (info.exact != null) {
       // 已经找到最短解，正在继续数「还有没有同样短的解」
-      return (
-        '最短 ' +
-        info.exact +
-        ' 步 · 正在确认唯一性… · ' +
-        formatNodes(info.nodes) +
-        ' 节点 · ' +
-        Math.round(info.elapsed) +
-        'ms'
-      );
+      return info.exact + ' 步 · 确认唯一性…';
     }
-    return (
-      '计算中… 最少 ≥ ' +
-      info.lower +
-      ' 步 · ' +
-      formatNodes(info.nodes) +
-      ' 节点 · ' +
-      Math.round(info.elapsed) +
-      'ms'
-    );
+    return '计算中… 最少 ≥ ' + info.lower + ' 步';
   }
 
   /** 出题时的唯一性判定超时、且精确计算也没给出个数时，补一次（限制步数内的解的个数） */
@@ -556,7 +534,7 @@
     els.statMinSteps.classList.toggle('computing', !!info && info.status === 'running');
     els.statMinSteps.classList.toggle('unique', !!info && info.status === 'done');
     els.statMinSteps.title =
-      info && info.status === 'running' ? '正在精确穷举，点一下可以停止计算' : '点一下可以重新开始计算';
+      info && info.status === 'running' ? '正在计算，点一下可以停止' : '点一下可以重新开始计算';
   }
 
   // ------------------------------------------------------------------ 渲染
@@ -614,10 +592,12 @@
   function layoutBoard() {
     const board = state.board;
     if (!board) return;
-    const wrapWidth = els.boardWrap.clientWidth || 600;
+    const stageWidth = els.boardStage.clientWidth || 600;
+    const compact = (global.innerWidth || stageWidth) <= 600;
+    const wrapWidth = stageWidth - (compact ? 44 + 12 : 56 + 20);
     const viewportHeight = global.innerHeight || 800;
-    const maxHeight = Math.max(220, Math.min(viewportHeight * 0.6, 620));
-    const gap = board.cols > 14 || board.rows > 11 ? 2 : 4;
+    const maxHeight = Math.max(240, Math.min(viewportHeight * 0.72, 820));
+    const gap = board.cols > 14 || board.rows > 11 ? 2 : 3;
     const cellSize = Math.max(
       9,
       Math.floor(
@@ -631,6 +611,7 @@
     els.board.style.setProperty('--cell', cellSize + 'px');
     els.board.style.gridTemplateColumns = 'repeat(' + board.cols + ', ' + cellSize + 'px)';
     els.board.style.gridTemplateRows = 'repeat(' + board.rows + ', ' + cellSize + 'px)';
+    els.boardWrap.style.width = (cellSize * board.cols + gap * (board.cols - 1)) + 'px';
   }
 
   function renderStats() {
@@ -642,10 +623,14 @@
     const target = puzzle ? puzzle.target : Core.DEFAULT_TARGET;
     els.statTarget.style.background = colorHex(target);
     els.statTarget.textContent = colorName(target);
+    els.statTarget.setAttribute('aria-label', colorName(target) + '色');
+    els.statTarget.title = '目标：' + colorName(target) + '色';
+    els.statTarget.dataset.mark = Core.COLORS[target].mark;
+    els.statTarget.classList.toggle('marks', !!state.settings.marks);
 
     // 「本题」这一栏的排布：
-    //   · 没开强制计算：上限 M 步 · 参考解 N 步 · 唯一解/多解（唯一解标识放最右）
-    //   · 开了强制计算：算之前显示「上限 + 参考解」；算出确切最短步数后
+    //   · 没在算最短步数：上限 M 步 · 参考解 N 步 · 唯一解/多解（唯一解标识放最右）
+    //   · 正在算最短步数：算之前显示「上限 + 参考解」；算出确切最短步数后
     //     参考解隐去，步数只由右边那栏「最短步数」负责
     const cap = puzzle ? puzzle.cap || puzzle.limit : 0;
     const parts = ['上限 ' + cap + ' 步'];
@@ -688,11 +673,13 @@
       button.type = 'button';
       button.className = 'swatch';
       button.dataset.color = String(index);
+      button.dataset.mark = color.mark;
       button.style.setProperty('--swatch', color.hex);
+      button.setAttribute('aria-label', color.name + '色（' + (index + 1) + '）');
+      button.title = color.name + '色 · 数字键 ' + (index + 1);
       button.innerHTML =
-        '<span class="swatch-dot"></span><span class="swatch-name">' +
-        color.name +
-        '色</span><span class="swatch-key">' +
+        '<span class="swatch-dot" aria-hidden="true"></span><span class="swatch-check" aria-hidden="true">✓</span><span class="sr-only">' +
+        color.name + '色</span><span class="swatch-key" aria-hidden="true">' +
         (index + 1) +
         '</span>';
       button.addEventListener('click', () => selectColor(index));
@@ -702,6 +689,7 @@
 
   function renderPalette() {
     const target = state.puzzle ? state.puzzle.target : Core.DEFAULT_TARGET;
+    els.palette.classList.toggle('marks', !!state.settings.marks);
     for (const button of els.palette.children) {
       const index = Number(button.dataset.color);
       button.classList.toggle('selected', index === state.selectedColor);
@@ -727,11 +715,13 @@
   function renderDemoControls() {
     const demo = state.demo;
     els.demoControls.hidden = !demo;
+    els.btnDemoNext.disabled = !demo || demo.auto || demo.i >= demo.moves.length;
+    els.btnDemoAll.disabled = !demo || demo.auto || demo.i >= demo.moves.length;
+    els.btnDemoStop.disabled = !demo;
+    els.btnDemoAll.setAttribute('aria-label', demo && demo.auto ? '演示中' : '完整演示');
+    els.btnDemoAll.title = demo && demo.auto ? '演示中…' : '完整演示';
     if (!demo) return;
     els.demoProgress.textContent = '演示：' + demo.i + ' / ' + demo.moves.length + ' 步';
-    els.btnDemoNext.disabled = demo.i >= demo.moves.length;
-    els.btnDemoAll.disabled = demo.auto || demo.i >= demo.moves.length;
-    els.btnDemoAll.textContent = demo.auto ? '演示中…' : '完整演示';
   }
 
   function renderMessage() {
@@ -1580,7 +1570,7 @@
         setMessage('已停止计算最短步数（目前只证明了最少 ≥ ' + lower + ' 步）。');
       } else {
         restartMinSteps();
-        setMessage('重新开始精确计算最短步数…（可以边玩边算）');
+        setMessage('重新开始计算最短步数…（可以边玩边算）');
       }
       renderMessage();
     });
@@ -1650,7 +1640,7 @@
     els.optMinSteps.addEventListener('change', () => {
       const on = els.optMinSteps.checked;
       if (state.draft) state.draft.computeMinSteps = on;
-      // 「强制计算」是显示/计算开关，立刻生效，不用重新出题
+      // 这个开关只控制「算不算」，立刻生效，不用重新出题
       state.settings.computeMinSteps = on;
       if (!on) {
         stopMinSteps('disabled');
@@ -1704,6 +1694,7 @@
   function init() {
     els = {
       board: byId('board'),
+      boardStage: byId('board-stage'),
       boardWrap: byId('board-wrap'),
       slots: byId('slots'),
       message: byId('message'),

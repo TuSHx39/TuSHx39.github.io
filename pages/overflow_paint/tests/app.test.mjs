@@ -147,6 +147,24 @@ test('app：初始化后棋盘、步数、调色盘都就绪', () => {
   }
 });
 
+test('app：启用色块图形标记后可辨认目标色与调色盘', () => {
+  const { dom, app, Core, timers } = boot();
+  click(dom, 'btn-options');
+  const marks = dom.document.getElementById('opt-marks');
+  marks.checked = true;
+  marks.dispatch('change', { target: marks });
+  click(dom, 'opt-apply');
+  timers.run();
+  const target = dom.document.getElementById('stat-target');
+  const palette = dom.document.getElementById('palette');
+  assert.equal(target.dataset.mark, Core.COLORS[app.puzzle.target].mark);
+  assert.equal(target.classList.contains('marks'), true);
+  assert.equal(palette.classList.contains('marks'), true);
+  for (const swatch of palette.children) {
+    assert.equal(swatch.dataset.mark, Core.COLORS[Number(swatch.dataset.color)].mark);
+  }
+});
+
 test('app：照着参考解点完就能通关', () => {
   const { dom, app, Core } = boot();
   const solution = app.puzzle.solution.slice();
@@ -205,6 +223,15 @@ test('app：提示会标出「点哪一块、染成什么颜色」', () => {
   assert.equal(app.hint, null);
 });
 
+test('app：演示操作常驻，未进入答案演示时禁用', () => {
+  const { dom } = boot();
+  for (const id of ['btn-demo-next', 'btn-demo-all', 'btn-demo-stop']) {
+    const button = dom.document.getElementById(id);
+    assert.equal(button.hidden, false);
+    assert.equal(button.disabled, true);
+  }
+});
+
 test('app：看答案 → 列出步骤，演示默认一步一步，可一键演到底再退出', () => {
   const { dom, app, Core, timers } = boot();
   const before = Core.serialize(app.board);
@@ -219,6 +246,9 @@ test('app：看答案 → 列出步骤，演示默认一步一步，可一键演
   click(dom, 'answer-demo');
   assert.equal(modal.hidden, true);
   assert.ok(app.demo, '应该进入演示状态');
+  for (const id of ['btn-demo-next', 'btn-demo-all', 'btn-demo-stop']) {
+    assert.equal(dom.document.getElementById(id).disabled, false);
+  }
   assert.equal(app.demo.i, 0, '默认不自动演，先等「下一步」');
   assert.equal(dom.document.getElementById('demo-controls').hidden, false);
   assert.equal(textOf(dom, 'demo-progress'), '演示：0 / ' + app.demo.moves.length + ' 步');
@@ -242,6 +272,9 @@ test('app：看答案 → 列出步骤，演示默认一步一步，可一键演
   assert.equal(app.demo, null);
   assert.equal(Core.serialize(app.board), before, '退出演示应恢复原局面');
   assert.equal(dom.document.getElementById('demo-controls').hidden, true);
+  for (const id of ['btn-demo-next', 'btn-demo-all', 'btn-demo-stop']) {
+    assert.equal(dom.document.getElementById(id).disabled, true);
+  }
 });
 
 test('app：勾选「强制计算最短步数」后边算边玩，算完只剩最短步数', () => {
@@ -373,7 +406,7 @@ test('app：计算期间照常可以落子，也可以点栏目停下来', () =>
 });
 
 test('app：关掉「强制计算最短步数」立刻清空并隐藏那一栏（不用重新出题）', () => {
-  const { dom, app, Core, timers } = boot();
+  const { dom, app, Core } = boot();
   const snapshot = Core.serialize(app.board);
   click(dom, 'btn-options');
   const uniqueBox = dom.document.getElementById('opt-unique');
@@ -384,13 +417,12 @@ test('app：关掉「强制计算最短步数」立刻清空并隐藏那一栏�
   const box = dom.document.getElementById('opt-minsteps');
   box.checked = true;
   box.dispatch('change', { target: box });
-  timers.run(30);
+  // 尚未推进后台任务，确定在计算中关闭；不依赖随机盘面的求解耗时。
+  assert.equal(app.minSteps.status, 'running');
   assert.equal(dom.document.getElementById('stat-min-wrap').hidden, false);
   assert.ok(textOf(dom, 'stat-minsteps').length > 0);
 
-  // 先停掉计算（免得它一直占着定时器队列），再关掉开关
-  click(dom, 'stat-min-wrap');
-  assert.equal(app.minSteps.status, 'stopped');
+  // 关闭开关应立即停止后台任务并隐藏状态。
   const box2 = dom.document.getElementById('opt-minsteps');
   box2.checked = false;
   box2.dispatch('change', { target: box2 });

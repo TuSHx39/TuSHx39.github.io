@@ -8,6 +8,27 @@ const Core = Yicai.Core;
 const Generator = Yicai.Generator;
 const Solver = Yicai.Solver;
 
+test('solver：缺少目标色时每种现有颜色都至少需要一步', () => {
+  const { Core, Solver } = loadYicai();
+  assert.equal(Solver.lowerBound(Core.deserialize('012', 1, 3), 3), 3);
+});
+
+test('solver：空洞隔开的区域下界相加', () => {
+  const { Core, Solver } = loadYicai();
+  const board = Core.createBoard(1, 7, Core.HOLE);
+  board.cells.set([0, 1, 2, -1, 0, 1, 2]);
+  assert.equal(Solver.lowerBound(board, 3), 6);
+});
+
+test('solver：完整排除较浅深度后搜索结果仍标记为最优', () => {
+  const { Core, Solver } = loadYicai();
+  const result = Solver.search(Core.deserialize('0110', 2, 2), 1, 3);
+  assert.equal(result.moves.length, 2);
+  assert.equal(result.optimal, true);
+  assert.equal(result.lowerBound, 2);
+});
+
+
 /** 小棋盘上的穷举最短路（BFS），用来验证求解器是否真的给出最短解 */
 function bruteForceMin(board, target, maxDepth = 14, onlyMerging = false) {
   if (Core.isSolved(board, target)) return 0;

@@ -44,6 +44,10 @@
       stamp: new Int32Array(n + 1),
       nbrs: new Int32Array(n + 1),
       stampValue: 0,
+      island: new Int32Array(n),
+      islandMasks: new Int32Array(n),
+      topology: null,
+      islandCount: 0,
     };
   }
 
@@ -55,6 +59,27 @@
     const Core = Yicai.Core;
     const n = cells.length;
     const { ids, seen, stack, size, color, offset, cursor, flat } = buf;
+    // 空洞隔开的区域互不影响，拓扑在整个搜索期间不变，只分析一次。
+    if (buf.topology !== adj) {
+      buf.topology = adj;
+      buf.island.fill(-1);
+      buf.islandCount = 0;
+      for (let i = 0; i < n; i++) {
+        if (cells[i] === Core.HOLE || buf.island[i] >= 0) continue;
+        let sp = 0;
+        stack[sp++] = i;
+        buf.island[i] = buf.islandCount;
+        while (sp) {
+          const cur = stack[--sp];
+          for (const nb of adj[cur]) {
+            if (cells[nb] === Core.HOLE || buf.island[nb] >= 0) continue;
+            buf.island[nb] = buf.islandCount;
+            stack[sp++] = nb;
+          }
+        }
+        buf.islandCount++;
+      }
+    }
     for (let i = 0; i < n; i++) {
       ids[i] = -1;
       seen[i] = 0;
@@ -131,14 +156,50 @@
 
   /**
    * 可用的下界（必须真实、不能超过最短步数）：
-   *   · 每步最多让棋盘少一种颜色，而终局只剩目标色一种 → 至少 颜色数-1 步；
-   *   · 盘面上没有目标色时，至少还要多花 1 步把它造出来。
+   *   · 每步最多消除一种非目标色 → 每个区域至少要「非目标颜色数」步；
+   *   · 空洞隔开的区域无法互相染色，各区域的下界相加。
    * 注意：「连通块数-1」不是合法下界（一次落子可以同时并掉好几块）。
    */
   function lowerBoundOf(buf, target) {
-    let lb = Math.max(0, distinctColors(buf) - 1);
-    if (lb === 0 && buf.count > 0 && !hasColor(buf, target)) lb = 1;
+    // 每步最多消掉一种非目标色；每个独立区域都要各自消掉这些颜色。
+    buf.islandMasks.fill(0, 0, buf.islandCount);
+    for (let c = 0; c < buf.count; c++) {
+      if (buf.color[c] !== target) {
+        buf.islandMasks[buf.island[buf.flat[buf.offset[c]]]] |= 1 << buf.color[c];
+      }
+    }
+    let lb = 0;
+    for (let i = 0; i < buf.islandCount; i++) {
+      let mask = buf.islandMasks[i];
+      while (mask) {
+        lb++;
+        mask &= mask - 1;
+      }
+    }
     return lb;
+  }
+
+  /** 同色连通块永远只会合并、不会拆开，因此可把初始色块压缩成图节点。 */
+  function createRegionGraph(board) {
+    const adj = Yicai.Core.buildAdjacency(board);
+    const buf = createBuffer(board.cells.length);
+    analyzeInto(board.cells, adj, buf);
+    const edges = Array.from({ length: buf.count }, () => new Set());
+    const representatives = new Int32Array(buf.count);
+    for (let c = 0; c < buf.count; c++) representatives[c] = buf.flat[buf.offset[c]];
+    for (let i = 0; i < board.cells.length; i++) {
+      const a = buf.ids[i];
+      if (a < 0) continue;
+      for (const nb of adj[i]) {
+        const b = buf.ids[nb];
+        if (b >= 0 && b !== a) edges[a].add(b);
+      }
+    }
+    return {
+      cells: buf.color.slice(0, buf.count),
+      adj: edges.map((edge) => Array.from(edge)),
+      representatives,
+    };
   }
 
   /**
@@ -262,16 +323,13 @@
     return 0;
   }
 
-  /** 64 位近似指纹（两个 32 位 hash 拼起来），用于搜索去重 */
+  /** 无碰撞的状态编码，精确搜索不能用近似指纹作为无解证明。 */
   function hashState(cells) {
-    let h1 = 0x811c9dc5;
-    let h2 = 0x01000193;
+    let key = '';
     for (let i = 0; i < cells.length; i++) {
-      const v = cells[i] + 2;
-      h1 = Math.imul(h1 ^ v, 16777619);
-      h2 = Math.imul(h2 + v, 2246822519) ^ (h2 << 5);
+      key += String.fromCharCode(cells[i] + 65);
     }
-    return (h1 >>> 0).toString(36) + ':' + (h2 >>> 0).toString(36);
+    return key;
   }
 
   /**
@@ -348,17 +406,17 @@
       if (result === 'found') {
         return {
           moves: path.slice(),
-          optimal: depth === startDepth && startDepth === rootLb,
+          optimal: startDepth === rootLb,
           nodes,
           timedOut: false,
-          lowerBound: rootLb,
+          lowerBound: startDepth === rootLb ? depth : rootLb,
         };
       }
       if (result === 'timeout') {
-        return { moves: null, optimal: false, nodes, timedOut: true, lowerBound: rootLb };
+        return { moves: null, optimal: false, nodes, timedOut: true, lowerBound: startDepth === rootLb ? depth : rootLb };
       }
     }
-    return { moves: null, optimal: false, nodes, timedOut: false, lowerBound: rootLb };
+    return { moves: null, optimal: false, nodes, timedOut: false, lowerBound: startDepth === rootLb ? cap + 1 : rootLb };
   }
 
   /**
@@ -488,6 +546,7 @@
 
   Yicai.Solver = {
     createBuffer,
+    createRegionGraph,
     analyzeInto,
     distinctColors,
     hasColor,

@@ -1542,13 +1542,32 @@ test('五线谱谱号：换谱号后音符跟着重新落位', () => {
   assert.equal(yOf(60), STAFF_TOP_Y - STAFF_SPACE, '低音谱号下 C4 的位置');
   assert.equal(collectByClass(appStaff().svg, 'staff-line').length, 5, '仍然只有一条谱表');
   assert.equal(paths(), 1, '低音谱号一个大弯');
-  assert.equal(fills(), 2, '低音谱号右边两个点');
+  assert.equal(fills(), 2, '低音谱号两个点');
+
+  // 大弯按需求左右镜像（开口朝左），两个点不跟着翻：仍留在大弯右边
+  const bass = collectByClass(appStaff().svg, 'clef-path')[0];
+  assert.match(bass.getAttribute('transform'), /scale\(-/, '低音谱号的大弯应该左右镜像');
+  const dots = collectByClass(appStaff().svg, 'clef-fill')
+    .map(dot => Number.parseFloat(dot.getAttribute('cx')));
+  assert.equal(dots.length, 2);
+  assert.equal(dots[0], dots[1], '两个点上下对齐');
+  // 大弯镜像后最右约在 58px 处，两个点要落在它右边
+  assert.ok(dots[0] > 60, `两个点应在大弯右边（cx=${dots[0]}）`);
 
   // 中音谱号：中间那条线就是 C4
   pickClef('alto');
   assert.equal(yOf(60), STAFF_TOP_Y + STAFF_SPACE * 2, '中音谱号下 C4 在中间那条线');
-  assert.equal(paths(), 2, '中音谱号左右两条括号');
-  assert.equal(fills(), 1, '中音谱号中央一个实心块');
+  assert.equal(paths(), 2, '中音谱号左右两个笔画');
+  assert.equal(fills(), 1, '中音谱号中央一个实心梭形');
+
+  // 中音谱号要和其他两个一样随性：全是曲线，不能出现直笔
+  const strokes = collectByClass(appStaff().svg, 'clef-path').map(path => path.getAttribute('d'));
+  for (const d of strokes) {
+    assert.ok(!/[LVH]/.test(d), '中音谱号不该有直线段');
+  }
+  // 而且左右两笔故意不对称，不能退化成镜像
+  const curves = d => (d.match(/C/g) || []).length;
+  assert.notEqual(curves(strokes[0]), curves(strokes[1]), '中音谱号左右两笔不应互为镜像');
 
   // 换回高音谱号，位置也回到原来那套
   pickClef('treble');

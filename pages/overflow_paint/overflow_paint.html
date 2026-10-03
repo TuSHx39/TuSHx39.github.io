@@ -15,108 +15,53 @@
 <div class="page">
 
   <header class="topbar">
-    <div class="title-block">
-      <h1>溢彩画</h1>
-      <p class="subtitle">点击一块同色区域染成所选颜色，在限制步数内把整幅图染成目标色。 ps:灵感来自鸣潮溢彩画</p>
-    </div>
-    <a class="back-link" href="../../index.html">← 返回主页</a>
+    <div class="title-block"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><h1>溢彩画</h1></div>
+    <a class="back-link" href="../../index.html" aria-label="返回主页" title="返回主页"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></svg></a>
   </header>
-
   <main class="layout">
-
-    <section class="panel board-panel">
+    <section class="board-panel" aria-label="涂色板">
       <div class="stats">
-        <div class="stat">
-          <span class="stat-label">剩余步数</span>
-          <strong class="stat-value" id="stat-left">–</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">已用</span>
-          <strong class="stat-value" id="stat-used">0 / 0</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">目标颜色</span>
-          <span class="chip-target" id="stat-target"></span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">本题</span>
-          <span class="difficulty" id="stat-difficulty">–</span>
-        </div>
-        <div class="stat" id="stat-min-wrap" hidden>
-          <span class="stat-label">最短步数</span>
-          <span class="difficulty" id="stat-minsteps" title="点一下可以停止计算">–</span>
-        </div>
+        <div class="stat"><span class="stat-label">剩余</span><strong class="stat-value" id="stat-left">–</strong></div>
+        <div class="stat stat-used"><span class="stat-label">已用</span><strong class="stat-value" id="stat-used">0 / 0</strong></div>
+        <div class="stat stat-goal"><span class="stat-label">目标</span><span class="chip-target" id="stat-target"></span></div>
+        <div class="stat" id="stat-min-wrap" hidden><span class="stat-label">最短</span><button type="button" class="difficulty" id="stat-minsteps" title="点一下可以停止计算">–</button></div>
       </div>
-
-      <div class="board-wrap" id="board-wrap">
-        <div class="board" id="board" role="grid" aria-label="溢彩画棋盘"></div>
-        <div class="banner" id="banner" hidden>
-          <div class="banner-card">
-            <h2 id="banner-title"></h2>
-            <p id="banner-text"></p>
-            <div class="banner-actions" id="banner-actions"></div>
-          </div>
+      <div class="board-stage" id="board-stage">
+        <div class="board-wrap" id="board-wrap">
+          <div class="board" id="board" role="grid" aria-label="溢彩画棋盘"></div>
+          <div class="banner" id="banner" hidden><div class="banner-card"><h2 id="banner-title"></h2><p id="banner-text"></p><div class="banner-actions" id="banner-actions"></div></div></div>
         </div>
+        <div class="palette" id="palette" role="group" aria-label="选择涂色颜色"></div>
       </div>
-
       <div class="slots" id="slots" aria-hidden="true"></div>
-      <p class="message info" id="message">正在准备棋盘…</p>
+      <div class="paint-dock">
+        <div class="toolbar" role="group" aria-label="画板操作">
+          <button type="button" id="btn-hint" class="tool-button" aria-label="提示" title="提示（H）" data-tooltip="提示"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 2H9s0-1-1-2Z"/><path d="M12 1v1M2 9h1m18 0h1M4 3l2 2m12 0 2-2"/></svg><span class="sr-only">提示</span></button>
+          <button type="button" id="btn-answer" class="tool-button" aria-label="看答案" title="看答案" data-tooltip="看答案"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6a3 3 0 0 1 3 3v14a4 4 0 0 0-4-2H4ZM20 4h-4a3 3 0 0 0-3 3v14a4 4 0 0 1 4-2h3Z"/><path d="M7 8h3m-3 4h3m6-4h1m-1 4h1"/></svg><span class="sr-only">看答案</span></button>
+          <button type="button" id="btn-demo-next" class="tool-button" aria-label="下一步" title="下一步" data-tooltip="下一步"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 4 10 8-10 8Z"/><path d="M20 4v16"/></svg><span class="sr-only">下一步</span></button>
+          <button type="button" id="btn-demo-all" class="tool-button" aria-label="完整演示" title="完整演示" data-tooltip="完整演示"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 4 12 8-12 8Z"/></svg><span class="sr-only">完整演示</span></button>
+          <button type="button" id="btn-demo-stop" class="tool-button" aria-label="结束演示" title="结束演示" data-tooltip="结束演示"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="sr-only">结束演示</span></button>
+          <button type="button" id="btn-plus" class="tool-button" aria-label="步数 +1" title="步数 +1" data-tooltip="步数 +1"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8m-4-4h8"/></svg><span class="sr-only">步数 +1</span></button>
+          <button type="button" id="btn-undo" class="tool-button" aria-label="撤销" title="撤销（U）" data-tooltip="撤销"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12h-3"/></svg><span class="sr-only">撤销</span></button>
+          <button type="button" id="btn-restart" class="tool-button" aria-label="重开本题" title="重开本题（R）" data-tooltip="重开本题"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/></svg><span class="sr-only">重开本题</span></button>
+          <button type="button" id="btn-new" class="tool-button" aria-label="随机新题" title="随机新题" data-tooltip="随机新题"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 4 18 16m-4 0h4v-4M3 20l6-6m6-6 6-4m-4 0h4v4"/></svg><span class="sr-only">随机新题</span></button>
+          <button type="button" id="btn-share" class="tool-button" aria-label="分享" title="分享" data-tooltip="分享"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="3"/><circle cx="18" cy="5" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8 10 7-4m-7 8 7 4"/></svg><span class="sr-only">分享</span></button>
+          <button type="button" id="btn-import" class="tool-button" aria-label="导入" title="导入" data-tooltip="导入"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 15v6h16v-6"/></svg><span class="sr-only">导入</span></button>
+          <button type="button" id="btn-options" class="tool-button" aria-label="设置" title="设置" data-tooltip="设置"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 2-1 3-2 1-3-1-2 4 2 2v2l-2 2 2 4 3-1 2 1 1 3h4l1-3 2-1 3 1 2-4-2-2v-2l2-2-2-4-3 1-2-1-1-3Z"/><circle cx="12" cy="12" r="3"/></svg><span class="sr-only">设置</span></button>
+        </div>
+        <div class="demo-controls" id="demo-controls" hidden><p class="tiny" id="demo-progress" role="status">演示：0 / 0</p></div>
+      </div>
+      <p class="message info" id="message" role="status" aria-live="polite">选一种颜色，点一块区域。</p>
+      <details class="play-help"><summary>怎么玩</summary><p>选色后点击相连色块，把画板染成目标色。同色点击不扣步。数字键 1–4 选色，H 提示，U 撤销，R 重开。齿轮中可调整尺寸、自绘图形和计算最短步数。</p><span class="difficulty" id="stat-difficulty">–</span></details>
     </section>
-
-    <aside class="side">
-
-      <section class="panel">
-        <h2 class="panel-title">调色盘</h2>
-        <div class="palette" id="palette"></div>
-        <p class="tiny">选一种颜色，再点棋盘上的色块；数字键也能选色。</p>
-      </section>
-
-      <section class="panel">
-        <h2 class="panel-title">操作</h2>
-        <div class="demo-controls" id="demo-controls" hidden>
-          <p class="tiny" id="demo-progress">演示：0 / 0</p>
-          <div class="actions three">
-            <button type="button" id="btn-demo-next">下一步</button>
-            <button type="button" id="btn-demo-all">完整演示</button>
-            <button type="button" id="btn-demo-stop">结束演示</button>
-          </div>
-        </div>
-        <div class="actions">
-          <button type="button" id="btn-hint" title="提示下一步（H）">提示</button>
-          <button type="button" id="btn-answer" title="查看从当前局面出发的参考解">看答案</button>
-          <button type="button" id="btn-plus" title="把限制步数 +1">步数 +1</button>
-          <button type="button" id="btn-undo" title="撤销上一步（U）">撤销</button>
-        </div>
-        <div class="actions">
-          <button type="button" id="btn-restart" title="回到本题初始局面（R）">重开本题</button>
-          <button type="button" id="btn-new" title="按当前设置随机出一题">随机新题</button>
-          <button type="button" id="btn-share" title="把当前题目保存成一串分享码">分享</button>
-          <button type="button" id="btn-import" title="用分享码载入一道题目">导入</button>
-          <button type="button" id="btn-options" class="primary wide" title="自定义棋盘形状、尺寸、步数与目标色">自定义选项</button>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2 class="panel-title">玩法</h2>
-        <ul class="tips">
-          <li>一次操作会染色<strong>整块相连的同色区域</strong>。</li>
-          <li>题目由随机拼块生成，出题时会把<strong>限制步数收紧到题目的实际难度</strong></li>
-          <li>题目参考解一定存在；卡住了就用<strong>提示 </strong>。</li>
-          <li>勾选「尽量出唯一解」可以让小棋盘出到已校验的唯一解题，棋盘越大越难成功。</li>
-          <li>勾选「强制计算最短步数」会用精确穷举算出<strong>真正的最短步数</strong>，算的时候可以正常游玩，点击状态栏最短步数项即可终止计算。</li>
-        </ul>
-      </section>
-
-    </aside>
-
   </main>
 </div>
 
-<!-- 自定义选项 -->
+<!-- 设置 -->
 <div class="modal" id="options-modal" hidden>
   <div class="modal-card">
     <header class="modal-head">
-      <h2>自定义选项</h2>
+      <h2>设置</h2>
       <button type="button" class="icon-btn" id="opt-close" aria-label="关闭">×</button>
     </header>
 
@@ -149,7 +94,7 @@
 
       <div class="field-row">
         <label class="field grow">
-          <span>限制步数上限（1–15，出题时会收紧到题目的实际难度）</span>
+          <span>步数上限</span>
           <input type="range" id="opt-limit" min="1" max="15" step="1" value="8">
         </label>
         <output class="limit-out" id="opt-limit-out">8 步</output>
@@ -162,17 +107,17 @@
 
       <label class="check">
         <input type="checkbox" id="opt-unique">
-        <span>尽量出「唯一解」的题目（棋盘小、步数少时更容易成功，出题会慢一点）</span>
+        <span>优先生成唯一解</span>
       </label>
 
       <label class="check">
         <input type="checkbox" id="opt-minsteps">
-        <span>强制计算最短步数（精确穷举，<b>计算时照常可以玩</b>，小棋盘很快、大棋盘可能算很久）</span>
+        <span>计算最短步数 · 可边玩边算</span>
       </label>
 
       <label class="check">
         <input type="checkbox" id="opt-marks">
-        <span>色盲辅助标记（在每个格子上显示图形符号）</span>
+        <span>色块图形标记</span>
       </label>
 
     </div>

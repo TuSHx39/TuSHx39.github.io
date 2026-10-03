@@ -25,6 +25,8 @@ const MAX_LEDGERS = 7;                  // 加线上限
  * 谱号：
  *   bottomStep = 最下面那条线对应的谱表音级（E4 = 30、F3 = 24、G2 = 18）
  *   art        = 手绘线条（坐标系按「线间距 = 10」设计，谱线在 y = 0/10/20/30/40）
+ *   mirror     = 造型左右镜像（低音谱号按需求把大弯翻过来，开口朝左）
+ *                单个部件还能用 part.mirror 覆盖（两个点就留在大弯右边不翻）
  */
 const CLEFS = {
   treble: {
@@ -41,24 +43,43 @@ const CLEFS = {
     label: '中音谱号',
     bottomStep: 24,     // 最下面那条线 = F3，中间那条线 = C4
     art: [
-      { type: 'path', d: 'M 16 3 C 11 3, 11 9, 16 11 L 16 29 C 11 31, 11 37, 16 37' },
-      { type: 'path', d: 'M 22 3 C 27 3, 27 9, 22 11 L 22 29 C 27 31, 27 37, 22 37' },
-      { type: 'path', d: 'M 19 20 L 28 15 L 28 25 Z', filled: true },
+      // 左笔：两处向外鼓、中间向里收，收在中间那条线上
+      {
+        type: 'path',
+        d: 'M 14.5 3 C 10 4.5, 9 8.5, 12 12.5 C 14.5 15.5, 16 17.5, 16 20 '
+          + 'C 16 22.5, 14.5 24.5, 12 27.5 C 9 31.5, 10 35.5, 14.5 37',
+      },
+      // 右笔：故意不跟左笔镜像 —— 上面多绕一圈、下面甩得更远、收笔带个小回勾
+      {
+        type: 'path',
+        d: 'M 23.2 3.2 C 27.6 2.6, 30.4 6.4, 29.2 10.2 C 28.2 13.4, 24.8 15.2, 23.4 18 '
+          + 'C 22.4 20.2, 23.4 22.4, 25.6 25 C 28.8 28.8, 30.2 32.6, 28.4 35.4 '
+          + 'C 27.2 37.2, 25 37.6, 23.2 36.6',
+      },
+      // 正中一个小小的梭形，压在中间那条线（C4）上，本身也微微歪着
+      {
+        type: 'path',
+        filled: true,
+        d: 'M 19.6 14.2 C 22 16.9, 23 18.5, 22.7 20.1 C 22.4 21.7, 21 23.2, 18.6 25.9 '
+          + 'C 16.6 23.3, 15.5 21.6, 15.6 20 C 15.7 18.5, 16.9 16.8, 19.6 14.2 Z',
+      },
     ],
   },
   bass: {
     label: '低音谱号',
     bottomStep: 18,     // 最下面那条线 = G2，第四条线（上数第二条）= F3
+    mirror: true,       // 大弯开口朝左（改成 false 就是传统的「开口朝右」写法）
     art: [
       // 起笔在 F 线上方，向左下兜一个大弯，到底部再向右勾回来
       { type: 'path', d: 'M 18 4 C 10 2, 5 7, 5 14 C 5 24, 7 34, 16 38 C 21 40, 26 38, 28 34' },
-      // 右侧两个点夹住 F 线
-      { type: 'circle', cx: 31, cy: 5, r: 1.9 },
-      { type: 'circle', cx: 31, cy: 15, r: 1.9 },
+      // 两个点不跟着翻，仍然待在大弯右边，一上一下夹住 F 线
+      { type: 'circle', cx: 35, cy: 5, r: 1.9, mirror: false },
+      { type: 'circle', cx: 35, cy: 15, r: 1.9, mirror: false },
     ],
   },
 };
 const CLEF_UNITS = 10;   // 上面图形使用的线间距
+const CLEF_BOX = 34;     // 上面图形占的横向宽度（镜像时的基准）
 
 /** 双声部时两条谱表的位置：上高音、下低音，中间留出一个八度左右 */
 const GRAND_STAVES = [
@@ -147,12 +168,20 @@ function createStaff(config = {}) {
     };
   }
 
-  function buildClefArt(part, topY) {
+  /**
+   * 一个谱号部件画成 SVG。
+   * 镜像以谱号为单位（clef.mirror），单个部件可以用 part.mirror 单独覆盖
+   * —— 低音谱号就是「大弯翻过来、两个点不翻」。
+   */
+  function buildClefArt(part, topY, clef) {
     const scale = SPACE / CLEF_UNITS;
+    const mirror = part.mirror === undefined ? Boolean(clef.mirror) : Boolean(part.mirror);
+    const flipX = value => (mirror ? CLEF_X + (CLEF_BOX - value) * scale : CLEF_X + value * scale);
+
     if (part.type === 'circle') {
       return svgEl('circle', {
         class: 'clef-fill',
-        cx: part.cx * scale + CLEF_X,
+        cx: flipX(part.cx),
         cy: topY + part.cy * scale,
         r: part.r * scale,
       });
@@ -160,8 +189,9 @@ function createStaff(config = {}) {
     return svgEl('path', {
       class: part.filled ? 'clef-fill' : 'clef-path',
       d: part.d,
-      fill: part.filled ? 'currentColor' : 'none',
-      transform: `translate(${CLEF_X}, ${topY}) scale(${scale})`,
+      transform: mirror
+        ? `translate(${CLEF_X + CLEF_BOX * scale}, ${topY}) scale(${-scale}, ${scale})`
+        : `translate(${CLEF_X}, ${topY}) scale(${scale})`,
     });
   }
 
@@ -185,8 +215,9 @@ function createStaff(config = {}) {
           class: 'staff-line', x1: 0, y1: y, x2: SHEET_WIDTH, y2: y,
         }));
       }
-      for (const part of CLEFS[staff.clefKey].art) {
-        clefGroup.appendChild(buildClefArt(part, staff.topY));
+      const clef = CLEFS[staff.clefKey];
+      for (const part of clef.art) {
+        clefGroup.appendChild(buildClefArt(part, staff.topY, clef));
       }
     }
     dirty = true;
