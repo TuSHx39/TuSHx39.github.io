@@ -11,9 +11,9 @@
 
 :root {
   /* 键床 */
-  --white-w: 44px;
-  --keys-h: 190px;
-  --felt-h: 14px;
+  --white-w: 46px;
+  --keys-h: 200px;
+  --felt-h: 18px;
   --pedal-h: 64px;
   --stage-h: calc(var(--keys-h) + var(--felt-h));
 
@@ -23,6 +23,13 @@
   --ink: #141922;
   --muted: #78808f;
   --line: rgba(20, 26, 38, .13);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --performance-top: calc(108px + env(safe-area-inset-top, 0px));
+  --score-gap: 72px;
+  --score-offset: 44px;
+  --score-width: 178px;
+  --chord-width: 224px;
+  --chord-font: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
 }
 
 /* 隐藏踏板时整条底栏收起，读数与琴床随变量一起平滑上移 */
@@ -55,7 +62,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  padding: 26px 20px 0;
+  padding: calc(28px + env(safe-area-inset-top, 0px)) 72px 0;
   text-align: center;
   pointer-events: none;
 }
@@ -63,12 +70,12 @@ body {
 .info h1 {
   margin: 0;
   font-size: 24px;
-  font-weight: 650;
-  letter-spacing: .06em;
+  font-weight: 550;
+  letter-spacing: .12em;
 }
 
 .hint {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-size: 12px;
   color: var(--muted);
   letter-spacing: .02em;
@@ -89,7 +96,7 @@ body {
   backdrop-filter: blur(10px) saturate(130%);
   -webkit-backdrop-filter: blur(10px) saturate(130%);
   border: 1px solid rgba(255, 255, 255, .7);
-  box-shadow: 0 8px 22px rgba(18, 26, 42, .10);
+  box-shadow: 0 4px 16px rgba(18, 26, 42, .04);
   transition:
     bottom .3s var(--ease),
     opacity .22s ease,
@@ -97,22 +104,23 @@ body {
 }
 
 #current-chord-alt {
-  bottom: calc(var(--pedal-h) + var(--stage-h) + 40px);
+  bottom: calc(var(--safe-bottom) + var(--pedal-h) + var(--stage-h) + 46px);
   max-width: min(92vw, 900px);
   padding: 5px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  color: var(--muted);
+  border-radius: 14px;
+  font-family: var(--chord-font);
+  font-size: 15px;
+  color: #000;
   line-height: 1.5;
 }
 
 #current-note {
-  bottom: calc(var(--pedal-h) + var(--stage-h) + 8px);
+  bottom: calc(var(--safe-bottom) + var(--pedal-h) + var(--stage-h) + 12px);
   max-width: min(92vw, 900px);
   padding: 5px 16px;
   border-radius: 999px;
   font-size: 13px;
-  color: var(--muted);
+  color: #626e80;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -131,7 +139,7 @@ body {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: var(--pedal-h);
+  bottom: calc(var(--safe-bottom) + var(--pedal-h));
   height: var(--stage-h);
   display: flex;
   align-items: flex-end;
@@ -140,7 +148,7 @@ body {
   border-radius: 16px 16px 0 0;
   background: linear-gradient(180deg, #2b3038 0%, #191d23 45%, #0b0d10 100%);
   box-shadow:
-    0 -16px 44px rgba(12, 18, 30, .30),
+    0 -10px 36px rgba(12, 18, 30, .18),
     inset 0 1px 0 rgba(255, 255, 255, .12);
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -160,6 +168,7 @@ body {
 /* 琴键上沿的毛毡条（同时作为触摸横向平移的区域） */
 .felt {
   height: var(--felt-h);
+  touch-action: pan-x;
   background: linear-gradient(180deg,
     #23272e 0%, #31363e 42%,
     #a4242f 43%, #6b1220 100%);
@@ -272,7 +281,7 @@ body.sustain-on .felt {
   text-align: center;
   font-size: 11px;
   letter-spacing: .02em;
-  color: #9aa3b2;
+  color: #788597;
   pointer-events: none;
 }
 
@@ -322,8 +331,15 @@ body.sustain-on .felt {
    ------------------------------------------------------------ */
 
 :root {
-  --score-bottom: calc(var(--pedal-h) + var(--stage-h) + 142px);
+  --score-bottom: calc(var(--safe-bottom) + var(--pedal-h) + var(--stage-h) + 96px);
   --score-height: 296px;
+  --performance-height: max(0px, calc(100vh - var(--performance-top) - var(--score-bottom)));
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --performance-height: max(0px, calc(100dvh - var(--performance-top) - var(--score-bottom)));
+  }
 }
 
 /* 双声部（大谱表）时谱面要更高：上高音、下低音，中间留出空隙 */
@@ -334,10 +350,13 @@ body.grand-staff {
 /* 谱面：背景透明，直接贴在网页背景上（所以不存在配色不一致的问题） */
 .sheet {
   position: fixed;
-  right: calc(50% + 88px);
+  right: calc(50% + var(--score-gap) / 2 + var(--score-offset));
   bottom: var(--score-bottom);
-  width: 178px;
-  height: var(--score-height);
+  width: var(--score-width);
+  height: var(--performance-height);
+  display: grid;
+  place-items: center;
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   pointer-events: none;
   transition: bottom .3s var(--ease), height .3s var(--ease), opacity .22s ease, visibility .22s ease;
@@ -347,16 +366,17 @@ body.grand-staff {
   display: block;
   width: 100%;
   height: 100%;
+  max-height: var(--score-height);
 }
 
 /* 和弦区域：与谱面完全独立，内容在区域内水平居中，
    符号本身与谱表中线同高，标注贴在符号正上方 */
 .chord-side {
   position: fixed;
-  left: calc(50% + 24px);
+  left: calc(50% + var(--score-gap) / 2);
   bottom: var(--score-bottom);
-  width: 220px;
-  height: var(--score-height);
+  width: var(--chord-width);
+  height: var(--performance-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -370,13 +390,15 @@ body.grand-staff {
 }
 
 #current-chord {
-  font-size: 42px;
-  font-weight: 650;
-  line-height: 1;
-  letter-spacing: .01em;
-  color: var(--ink);
+  max-width: 100%;
+  font-family: var(--chord-font);
+  font-size: clamp(30px, 3.6vw, 44px);
+  font-weight: 400;
+  line-height: 1.18;
+  letter-spacing: -.025em;
+  color: #000;
   text-align: center;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* 没有和弦时整块留空 */
@@ -402,7 +424,7 @@ body.grand-staff {
   stroke-linejoin: round;
 }
 
-/* 谱号里实心的部分（中音谱号中央的方块、低音谱号右侧的两个点） */
+/* 谱号里实心的部分（中音谱号中央的梭形、低音谱号右侧的两个点） */
 .clef-fill {
   fill: #1d2430;
   stroke: none;
@@ -429,13 +451,14 @@ body.grand-staff {
   left: 0;
   right: 0;
   bottom: 0;
-  height: var(--pedal-h);
+  height: calc(var(--pedal-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   font-size: .9rem;
-  letter-spacing: .12em;
+  letter-spacing: .06em;
   color: #cbd3e0;
   background: linear-gradient(180deg, #3a4049 0%, #23272e 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10);
@@ -455,21 +478,56 @@ body.sustain-on .pedal {
   background: linear-gradient(180deg, #f2f5fa 0%, #cdd5e1 100%);
 }
 
+/* 安全区仍给琴床留出空间，隐藏踏板时不留下文字或可点击区域。 */
+body.pedal-hidden .pedal {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ------------------------------------------------------------
-   设置：齿轮按钮
+   导航与设置图标
    ------------------------------------------------------------ */
+
+.menu-back {
+  position: fixed;
+  top: calc(22px + env(safe-area-inset-top, 0px));
+  left: calc(24px + env(safe-area-inset-left, 0px));
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: #000;
+  opacity: .78;
+  text-decoration: none;
+  z-index: 10001;
+}
+
+.menu-back svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.menu-back:hover {
+  opacity: 1;
+}
 
 #settings-btn {
   position: fixed;
-  top: 22px;
-  right: 24px;
-  width: 32px;
-  height: 32px;
+  top: calc(22px + env(safe-area-inset-top, 0px));
+  right: calc(24px + env(safe-area-inset-right, 0px));
+  width: 44px;
+  height: 44px;
+  padding: 9px;
   cursor: pointer;
   z-index: 10001;
 }
 
 #settings-btn img {
+  display: block;
   width: 100%;
   height: 100%;
   opacity: .78;
@@ -490,40 +548,50 @@ body.sustain-on .pedal {
 
 #settings-panel {
   position: fixed;
-  top: -55vh;
-  right: 0;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  right: calc(16px + env(safe-area-inset-right, 0px));
   left: auto;
-  /* 只占屏幕右半边（宽屏再收窄一点），这样每行的标签与控件不会离得太远 */
-  width: min(48vw, 440px);
-  height: 50vh;
+  width: min(400px, calc(100% - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  height: min(610px, calc(100vh - 32px - env(safe-area-inset-top, 0px) - var(--safe-bottom)));
+  height: min(610px, calc(100dvh - 32px - env(safe-area-inset-top, 0px) - var(--safe-bottom)));
 
-  background: rgba(160, 165, 170, 0.18);
-  backdrop-filter: blur(18px) saturate(120%);
-  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .76), rgba(250, 252, 255, .6));
+  backdrop-filter: blur(22px) saturate(135%) brightness(1.1);
+  -webkit-backdrop-filter: blur(22px) saturate(135%) brightness(1.1);
 
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, .85);
+  box-shadow: 0 18px 56px rgba(35, 47, 68, .12), inset 0 1px 0 #fff;
 
-  border-radius: 0 0 0 22px;
-  transition: top .38s var(--ease);
+  border-radius: 22px;
+  overflow: hidden;
+  /* 隐藏距离由面板自身高度决定，缩放或手机断点不会露出菜单底边。 */
+  transform: translateY(calc(-100% - 32px - env(safe-area-inset-top, 0px)));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform .38s var(--ease), opacity .2s ease, visibility .38s;
 
   z-index: 9000;
 }
 
 #settings-panel.open {
-  top: 0;
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .settings-content {
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
 .settings-content h2 {
-  margin-top: 0;
-  font-size: 22px;
+  margin: 0 48px 22px 0;
+  font-size: 21px;
+  font-weight: 550;
+  letter-spacing: .05em;
 }
 
 /* 三张页平铺，靠 --page-index 整体平移（面板宽度刚好露出一张）
@@ -531,6 +599,7 @@ body.sustain-on .pedal {
 .settings-pages {
   display: flex;
   width: 300%;
+  height: 100%;
   --page-index: 0;
   transform: translateX(calc(var(--page-index) * -33.3333%));
   transition: transform .38s var(--ease);
@@ -538,7 +607,14 @@ body.sustain-on .pedal {
 
 .page {
   flex: 0 0 33.3333%;
-  padding: 20px 32px 24px;
+  min-width: 0;
+  height: 100%;
+  padding: 24px 26px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #bbc3ce transparent;
   /* 没露出来的页不该被点到；顺手淡一点，翻页时更顺 */
   opacity: .3;
   pointer-events: none;
@@ -553,8 +629,8 @@ body.sustain-on .pedal {
 .sub-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin: -6px 40px 16px -8px;
 }
 
 .sub-header h2 {
@@ -565,8 +641,12 @@ body.sustain-on .pedal {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin: 12px 0;
+  gap: 14px;
+  min-width: 0;
+  min-height: 52px;
+  margin: 0;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(73, 88, 111, .07);
 }
 
 .setting-item.has-sub {
@@ -574,40 +654,92 @@ body.sustain-on .pedal {
 }
 
 .setting-item label {
-  font-size: 16px;
-  color: #222;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #475366;
 }
 
 .setting-item input,
 .setting-item select {
-  background: rgba(255, 255, 255, 0.5);
-  border: none;
-  border-radius: 6px;
-  padding: 4px 8px;
+  min-width: 0;
+  min-height: 36px;
+  max-width: 52%;
+  background: rgba(255, 255, 255, .7);
+  border: 1px solid rgba(73, 88, 111, .12);
+  border-radius: 9px;
+  padding: 6px 10px;
   color: inherit;
   font: inherit;
+  font-size: 16px;
+  accent-color: #667c99;
+  flex-shrink: 0;
+}
+
+.setting-item input[type="number"] {
+  width: 94px;
 }
 
 .setting-item select {
-  padding: 5px 8px;
+  width: 132px;
   cursor: pointer;
 }
 
 .setting-item input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  appearance: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #b9c3d0;
+  border-radius: 999px;
+  background: #d1d8e2;
   cursor: pointer;
+  transition: background .2s ease, border-color .2s ease;
+}
+
+.setting-item input[type="checkbox"]::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(35, 47, 68, .16);
+  transition: transform .2s var(--ease);
+}
+
+.setting-item input[type="checkbox"]:checked {
+  border-color: #687e9c;
+  background: #687e9c;
+}
+
+.setting-item input[type="checkbox"]:checked::before {
+  transform: translateX(16px);
 }
 
 .setting-item input[type="range"] {
-  width: 45%;
+  width: 46%;
+  min-height: 36px;
   padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .sub-btn,
 .back-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   border: none;
-  background: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .55);
   font: inherit;
   font-size: 18px;
   color: inherit;
@@ -632,7 +764,9 @@ body.sustain-on .pedal {
 /* 和弦识别开启时才展开的次级设置；收起时连外边距一起收掉，不留空白 */
 .sub-setting {
   margin: 0;
-  padding-left: 12px;
+  padding: 0 0 0 12px;
+  min-height: 0;
+  border-bottom: 0;
   border-left: 2px solid transparent;
   font-size: 14px;
   opacity: 0;
@@ -650,10 +784,22 @@ body.sustain-on .pedal {
 }
 
 .sub-setting.show {
-  margin: 12px 0;
+  margin: 4px 0 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
   max-height: 72px;
   border-left-color: rgba(0, 0, 0, 0.08);
   opacity: .9;
+}
+
+.menu-back:focus-visible,
+#settings-btn:focus-visible,
+.setting-item input:focus-visible,
+.setting-item select:focus-visible,
+.sub-btn:focus-visible,
+.back-btn:focus-visible {
+  outline: 2px solid #667c99;
+  outline-offset: 3px;
 }
 
 /* 五线谱子选项：总开关关掉时只是变暗，位置与高度照旧保留（不消失、不塌陷） */
@@ -689,14 +835,19 @@ body.sustain-on .pedal {
 
 @media (max-width: 700px) {
   :root {
-    --white-w: 38px;
-    --keys-h: 168px;
-    --felt-h: 12px;
-    --pedal-h: 56px;
+    --white-w: 42px;
+    --keys-h: 176px;
+    --felt-h: 24px;
+    --pedal-h: 58px;
+    --performance-top: calc(82px + env(safe-area-inset-top, 0px));
+    --score-gap: 20px;
+    --score-offset: 8px;
+    --score-width: min(152px, calc(50vw - 28px));
+    --chord-width: min(176px, calc(50vw - 28px));
   }
 
   .info {
-    padding-top: 18px;
+    padding-top: calc(25px + env(safe-area-inset-top, 0px));
   }
 
   .info h1 {
@@ -707,145 +858,103 @@ body.sustain-on .pedal {
     display: none;
   }
 
-  #settings-panel {
-    right: 4vw;
-    left: auto;
-    width: 88vw;
-    height: 58vh;
-    border-radius: 0 0 22px 22px;
+  #settings-btn {
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px));
+  }
+
+  .menu-back {
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: calc(16px + env(safe-area-inset-left, 0px));
   }
 
   .page {
-    padding: 18px 20px 24px;
+    padding: 24px 20px;
+  }
+
+  #current-chord {
+    font-size: clamp(26px, 7vw, 36px);
+  }
+
+  #current-chord-alt {
+    max-width: calc(100vw - 32px);
+    font-size: 14px;
   }
 }
 
-@media (max-width: 420px) {
-  :root {
-    --white-w: 32px;
-    --keys-h: 150px;
+/* 手机上电脑键位提示保持原开关控制，触屏设备仅简化提示文案。 */
+@media (pointer: coarse) {
+  .hint {
+    display: block;
+    font-size: 0;
   }
 
-  /* 小屏放不下键位标注：直接不显示，免得糊成一片 */
-  .key-hint {
-    display: none;
-  }
-
-  .setting-item label {
-    font-size: 15px;
-  }
-}
-
-/* 双声部比单谱表高一大截，矮一点的窗口按档缩小，免得上半张被顶出画面
-   （和弦区跟着一起缩，两者中线才对得齐） */
-@media (max-height: 900px) {
-  body.grand-staff .sheet {
-    transform: scale(.8);
-    transform-origin: 100% 100%;
-  }
-
-  body.grand-staff .chord-side {
-    transform: scale(.8);
-    transform-origin: 0 100%;
-  }
-}
-
-@media (max-height: 780px) {
-  body.grand-staff .sheet {
-    transform: scale(.68);
-  }
-
-  body.grand-staff .chord-side {
-    transform: scale(.68);
-  }
-}
-
-@media (max-height: 680px) {
-  body.grand-staff .sheet {
-    transform: scale(.58);
-  }
-
-  body.grand-staff .chord-side {
-    transform: scale(.58);
+  .hint::after {
+    content: '轻触琴键弹奏 · 拖动连奏 · 滑动琴键上沿切换音区';
+    font-size: 11px;
+    line-height: 1.5;
+    letter-spacing: 0;
   }
 }
 
 @media (max-height: 620px) {
   :root {
-    --keys-h: 152px;
-    --pedal-h: 52px;
+    --keys-h: clamp(112px, 27vh, 152px);
+    --pedal-h: 44px;
+    --felt-h: 20px;
+    --performance-top: calc(66px + env(safe-area-inset-top, 0px));
+    --score-bottom: calc(var(--safe-bottom) + var(--pedal-h) + var(--stage-h) + 72px);
+  }
+
+  .info {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  }
+
+  .info h1 {
+    font-size: 18px;
+  }
+
+  #settings-btn,
+  .menu-back {
+    top: calc(10px + env(safe-area-inset-top, 0px));
   }
 
   .hint {
     display: none;
   }
 
+  .hint::after {
+    content: none;
+  }
+
   #current-chord-alt {
-    bottom: calc(var(--pedal-h) + var(--stage-h) + 26px);
+    bottom: calc(var(--safe-bottom) + var(--pedal-h) + var(--stage-h) + 36px);
+    padding: 3px 12px;
+    font-size: 13px;
   }
 
   #current-note {
-    bottom: calc(var(--pedal-h) + var(--stage-h) + 4px);
-  }
-
-  /* 矮窗口：谱面与和弦各自等比缩小（锚点不变，互不影响） */
-  .sheet {
-    transform: scale(.72);
-    transform-origin: 100% 100%;
-  }
-
-  .chord-side {
-    transform: scale(.72);
-    transform-origin: 0 100%;
-  }
-
-  /* 双声部再小一档（它本来就更宽更高） */
-  body.grand-staff .sheet {
-    transform: scale(.6);
-  }
-
-  body.grand-staff .chord-side {
-    transform: scale(.6);
+    bottom: calc(var(--safe-bottom) + var(--pedal-h) + var(--stage-h) + 6px);
+    padding: 4px 14px;
+    font-size: 12px;
   }
 }
 
-/* 极矮的窗口（例如横屏手机）：再缩一档，保证键盘和读数可用 */
-@media (max-height: 520px) {
-  .sheet {
-    transform: scale(.56);
-  }
-
-  .chord-side {
-    transform: scale(.56);
-  }
-
-  body.grand-staff .sheet {
-    transform: scale(.46);
-  }
-
-  body.grand-staff .chord-side {
-    transform: scale(.46);
-  }
-}
-
-/* 窄屏：把两者往中间收，并缩一点，避免和弦区域溢出 */
-@media (max-width: 700px) {
+/* 横屏和高倍缩放时先让出演奏空间，谱面由剩余高度等比缩放。 */
+@media (max-height: 420px) {
   :root {
-    --score-height: 250px;
-  }
-
-  .sheet {
-    right: calc(50% + 26px);
-    width: 152px;
-  }
-
-  .chord-side {
-    left: calc(50% + 12px);
-    width: 150px;
+    --keys-h: clamp(88px, 28vh, 112px);
+    --pedal-h: 38px;
+    --performance-top: calc(54px + env(safe-area-inset-top, 0px));
+    --score-bottom: calc(var(--safe-bottom) + var(--pedal-h) + var(--stage-h) + 66px);
   }
 
   #current-chord {
-    font-size: 32px;
+    font-size: 28px;
+  }
+
+  .pedal {
+    font-size: 12px;
   }
 }
 

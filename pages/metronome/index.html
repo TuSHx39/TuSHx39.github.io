@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f6f2">
+  <meta name="description" content="可视化节拍器，支持 Swing、连音、自定义单小节节奏、多音色与练习设置。">
+  <title>节拍器 · TuSHx39</title>
+  <link rel="icon" href="../../assets/images/favicon.png">
+  <link rel="stylesheet" href="metronome.css?v=20261013">
+</head>
+<body>
+  <svg class="svg-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 11 7-11 7Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-tap" viewBox="0 0 24 24"><path d="M9 11V6a2 2 0 0 1 4 0v5m0-2h2a2 2 0 0 1 2 2v1h1a2 2 0 0 1 2 2v3l-3 4h-7l-5-7a2 2 0 0 1 3-2l1 1v-2M5 6H2m4-3L4 1m12 4 3-2"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6M8 12h12"/></symbol>
+    <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4ZM17 8c3 2 3 6 0 8m3-11c5 4 5 10 0 14"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></symbol>
+    <symbol id="i-notes" viewBox="0 0 24 24"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="16" rx="3" ry="2"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-practice" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  </svg>
+
+  <div class="app-shell">
+    <header class="page-header">
+      <div class="identity">
+        <a class="back-link icon-button" href="../../index.html" aria-label="返回工具首页"><svg><use href="#i-back"/></svg></a>
+        <div class="app-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="m12 5-6 23h20L20 5a2 2 0 0 0-2-1h-4a2 2 0 0 0-2 1Z" fill="currentColor" opacity=".18"/><path d="m12 5-6 23h20L20 5a2 2 0 0 0-2-1h-4a2 2 0 0 0-2 1Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m16 23 7-16M14 11h4M13 16h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="16" cy="23" r="2" fill="currentColor"/></svg></div>
+        <h1>节拍器</h1>
+      </div>
+      <div class="mode-switch" role="group" aria-label="功能模式">
+        <button id="basic-mode" class="selected" type="button" aria-pressed="true">简洁</button>
+        <button id="advanced-mode" type="button" aria-pressed="false">完整</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="transport-panel" aria-label="节拍器控制">
+        <div class="transport-top">
+          <div class="playback-state"><span id="status-dot" class="status-dot" aria-hidden="true"></span><span id="playback-status" role="status">已停止</span></div>
+          <div class="meter-controls">
+            <label for="beats">每小节拍数</label>
+            <select id="beats"></select>
+          </div>
+        </div>
+
+        <div class="visualization" id="visualization" aria-label="小节节奏读条">
+          <div id="beat-labels" class="beat-labels"></div>
+          <div class="rhythm-rail" id="rhythm-rail">
+            <div id="rail-beats" class="rail-beats"></div>
+            <div id="rail-fill" class="rail-fill"></div>
+            <div id="rail-notes" class="rail-notes"></div>
+            <div id="playhead" class="playhead"></div>
+          </div>
+          <div class="rail-caption"><span id="rhythm-caption" hidden></span><span id="position-label">第 1 拍 / 4 拍</span></div>
+        </div>
+
+        <div class="transport-controls">
+          <div class="tempo-area">
+            <div class="tempo-input-row">
+              <button id="tempo-minus" class="tempo-step" type="button" aria-label="速度减一">−</button>
+              <div class="tempo-number"><label class="sr-only" for="bpm">速度 BPM</label><input id="bpm" type="number" min="20" max="300" step="1" value="120"><span>BPM</span></div>
+              <button id="tempo-plus" class="tempo-step" type="button" aria-label="速度加一">+</button>
+            </div>
+            <label class="sr-only" for="tempo-range">速度滑杆</label><input id="tempo-range" class="tempo-range" type="range" min="20" max="300" value="120">
+            <span id="tempo-unit" class="sr-only">以四分音符为一拍</span>
+          </div>
+          <div class="play-area">
+            <button id="play-button" class="play-button" type="button"><svg aria-hidden="true"><use href="#i-play"/></svg><span>开始</span><kbd>空格</kbd></button>
+            <button id="tap-button" class="tap-button" type="button"><svg aria-hidden="true"><use href="#i-tap"/></svg><span class="tap-label">测速</span><output id="tap-count" hidden></output><kbd>T</kbd></button>
+          </div>
+        </div>
+
+        <div class="transport-bottom">
+          <label class="switch-label"><input id="accent" type="checkbox" checked><span class="switch"></span><span>首拍重音</span></label>
+          <div class="volume-control"><svg aria-hidden="true"><use href="#i-volume"/></svg><label class="sr-only" for="volume">音量</label><input id="volume" type="range" min="0" max="100" value="70"><output id="volume-label" for="volume">70%</output></div>
+        </div>
+      </section>
+
+      <div id="advanced-panel" class="advanced-layout" hidden>
+        <div class="rhythm-workspace">
+          <section class="panel presets-panel" aria-labelledby="presets-heading">
+            <div class="section-heading"><h2 id="presets-heading"><svg aria-hidden="true"><use href="#i-notes"/></svg>节奏预设</h2></div>
+            <div id="preset-list" class="preset-list" role="group" aria-label="选择节奏预设"></div>
+            <div class="swing-control"><label for="swing">Swing 比例</label><input id="swing" type="range" min="50" max="75" value="67"><output id="swing-label" for="swing">67 : 33</output></div>
+          </section>
+
+          <section class="panel editor-panel" aria-labelledby="editor-heading">
+            <div class="section-heading"><h2 id="editor-heading"><svg aria-hidden="true"><use href="#i-grid"/></svg>小节编排</h2><span id="editor-meter" class="meter-badge">4 拍</span></div>
+            <div class="editor-toolbar">
+              <div id="paint-tools" class="paint-tools" role="group" aria-label="编辑工具"><button data-tool="cycle" class="selected" type="button" aria-pressed="true">循环</button><button data-tool="normal" type="button" aria-pressed="false"><span class="note-dot"></span>普通</button><button data-tool="accent" type="button" aria-pressed="false"><span class="note-diamond"></span>重音</button><button data-tool="rest" type="button" aria-pressed="false">— 休止</button></div>
+              <button id="clear-pattern" class="text-button" type="button">全部休止</button>
+            </div>
+            <div id="beat-editor" class="beat-editor"></div>
+            <div id="note-inspector" class="note-inspector" hidden>
+              <div class="inspector-title"><strong id="selected-note-label">第 1 拍 · 第 1 格</strong><span class="subtle">音符设置</span></div>
+              <div class="inspector-fields">
+                <label>类型<select id="note-kind"><option value="normal">普通</option><option value="accent">重音</option><option value="rest">休止</option></select></label>
+                <label class="velocity-field">力度 <output id="velocity-label">80%</output><input id="note-velocity" type="range" min="0" max="100" value="80"></label>
+                <label>音色<select id="note-sound"><option value="inherit">跟随全局</option></select></label>
+              </div>
+            </div>
+            <div class="editor-footer"><button id="restore-pattern" class="text-button" type="button">重置为每拍一次</button></div>
+          </section>
+        </div>
+
+        <aside class="settings-workspace">
+          <section class="panel sound-panel" aria-labelledby="sound-heading">
+            <div class="section-heading"><h2 id="sound-heading"><svg aria-hidden="true"><use href="#i-volume"/></svg>音色</h2><button id="preview-sound" class="text-button" type="button">试听</button></div>
+            <div id="sound-list" class="sound-list" role="group" aria-label="全局音色"></div>
+          </section>
+
+          <section class="panel practice-panel" aria-labelledby="practice-heading">
+            <div class="section-heading"><h2 id="practice-heading"><svg aria-hidden="true"><use href="#i-practice"/></svg>练习设置</h2></div>
+            <div class="practice-item"><label class="switch-label"><span>预备小节</span><input id="count-in" type="checkbox"><span class="switch"></span></label></div>
+            <div class="practice-item"><label class="switch-label"><span>静音练习</span><input id="mute-enabled" type="checkbox"><span class="switch"></span></label><div id="mute-options" class="practice-options" hidden><label>播放<input id="play-bars" type="number" min="1" max="32" value="3">小节</label><label>静音<input id="mute-bars" type="number" min="1" max="32" value="1">小节</label></div></div>
+            <div class="practice-item"><label class="switch-label"><span>渐进提速</span><input id="ramp-enabled" type="checkbox"><span class="switch"></span></label><div id="ramp-options" class="practice-options" hidden><label>每<input id="ramp-every" type="number" min="1" max="64" value="4">小节</label><label>增加<input id="ramp-step" type="number" min="1" max="30" value="5">BPM</label><label class="full-option">上限<input id="ramp-max" type="number" min="20" max="300" value="180">BPM</label></div></div>
+            <div class="practice-item"><label class="switch-label"><span>自动停止</span><input id="stop-enabled" type="checkbox"><span class="switch"></span></label><div id="stop-options" class="practice-options" hidden><label>播放<input id="stop-bars" type="number" min="1" max="999" value="32">小节后停止</label></div></div>
+            <div class="session-stats"><div><span>已播放</span><strong id="bar-counter">0 <small>小节</small></strong></div><div><span>练习时间</span><strong id="session-time">00:00</strong></div></div>
+          </section>
+        </aside>
+
+        <section class="library-bar" aria-label="保存和导入节奏"><span id="save-status" role="status" hidden></span><div><button id="export-button" class="utility-button" type="button"><svg aria-hidden="true"><use href="#i-download"/></svg>导出节奏</button><button id="import-button" class="utility-button" type="button"><svg aria-hidden="true"><use href="#i-upload"/></svg>导入节奏</button><input id="import-file" type="file" accept=".json,application/json" hidden></div></section>
+      </div>
+      <p id="error-message" class="error-message" role="alert" hidden></p>
+    </main>
+  </div>
+  <script defer src="js/metronome.js"></script>
+</body>
+</html>
