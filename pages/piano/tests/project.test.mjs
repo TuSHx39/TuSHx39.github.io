@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 import { loadPianoScripts, scriptSources } from './helpers/load-piano.mjs';
@@ -37,7 +37,8 @@ test('piano.html 引用的脚本与样式都存在', () => {
 
   assert.ok(scripts.length > 0, '没有找到脚本引用');
   for (const src of [...scripts, ...styles]) {
-    assert.ok(existsSync(join(root, src)), `piano.html 引用的 ${src} 不存在`);
+    const resource = new URL(src, pathToFileURL(join(root, 'piano.html')));
+    assert.ok(existsSync(resource), `piano.html 引用的 ${src} 不存在`);
   }
   assert.ok(scripts.includes('js/main.js'), '入口脚本应为 js/main.js');
 });
@@ -187,7 +188,7 @@ test('五线谱：容器、开关、SVG 样式都在', () => {
 
   // 符头是实心的、没有符干
   const headRule = css.match(/\.note-head\s*\{[^}]*\}/)[0];
-  assert.match(headRule, /fill:\s*#161c26/i, '符头要实心');
+  assert.match(headRule, /fill:\s*(?:#[\da-f]{3,8}|var\(--[\w-]+\))\s*;/i, '符头要使用实色或主题颜色');
   assert.ok(!/stroke:/.test(headRule), '实心符头不需要描边');
   assert.ok(!/\.note-stem\s*\{/.test(css), '不应该再有符干样式');
   assert.ok(!/note-stem/.test(readFileSync(join(jsDir, 'staff.js'), 'utf8')), 'staff.js 不该再画符干');

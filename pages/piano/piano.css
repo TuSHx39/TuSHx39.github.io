@@ -20,9 +20,9 @@
   /* 动效与配色 */
   --ease: cubic-bezier(.22, 1, .36, 1);
   --ease-fast: cubic-bezier(.4, 0, .2, 1);
-  --ink: #141922;
-  --muted: #78808f;
-  --line: rgba(20, 26, 38, .13);
+  --ink: var(--site-ink);
+  --muted: var(--site-muted);
+  --line: var(--site-line);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --performance-top: calc(108px + env(safe-area-inset-top, 0px));
   --score-gap: 72px;
@@ -46,10 +46,9 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+  font-family: var(--site-font);
   color: var(--ink);
-  background:
-    radial-gradient(120% 90% at 50% -10%, #ffffff 0%, #f5f7fb 42%, #e7ebf2 100%);
+  background: var(--site-bg);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -110,7 +109,7 @@ body {
   border-radius: 14px;
   font-family: var(--chord-font);
   font-size: 15px;
-  color: #000;
+  color: var(--ink);
   line-height: 1.5;
 }
 
@@ -120,7 +119,7 @@ body {
   padding: 5px 16px;
   border-radius: 999px;
   font-size: 13px;
-  color: #626e80;
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -146,7 +145,7 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
   border-radius: 16px 16px 0 0;
-  background: linear-gradient(180deg, #2b3038 0%, #191d23 45%, #0b0d10 100%);
+  background: linear-gradient(180deg, #303a34 0%, #1e2621 45%, #101512 100%);
   box-shadow:
     0 -10px 36px rgba(12, 18, 30, .18),
     inset 0 1px 0 rgba(255, 255, 255, .12);
@@ -170,8 +169,8 @@ body {
   height: var(--felt-h);
   touch-action: pan-x;
   background: linear-gradient(180deg,
-    #23272e 0%, #31363e 42%,
-    #a4242f 43%, #6b1220 100%);
+    #282f2a 0%, #353f37 42%,
+    #a95e50 43%, #6c3d35 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18);
   transition: filter .25s ease, box-shadow .25s ease;
 }
@@ -180,7 +179,7 @@ body.sustain-on .felt {
   filter: brightness(1.3) saturate(1.15);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, .35),
-    0 0 18px rgba(214, 64, 72, .55);
+    0 0 18px rgba(182, 125, 53, .45);
 }
 
 #piano {
@@ -203,7 +202,7 @@ body.sustain-on .felt {
   flex: none;
   width: var(--white-w);
   height: var(--keys-h);
-  background: linear-gradient(180deg, #ffffff 0%, #fcfdff 55%, #e9edf4 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #fffefb 55%, #e8eae3 100%);
   border-right: 1px solid var(--line);
   border-radius: 0 0 9px 9px;
   box-shadow:
@@ -246,7 +245,7 @@ body.sustain-on .felt {
   position: absolute;
   top: 0;
   z-index: 10;
-  background: linear-gradient(180deg, #4b515a 0%, #23272e 45%, #090b0e 100%);
+  background: linear-gradient(180deg, #4a534b 0%, #282f2a 45%, #101512 100%);
   border-radius: 0 0 6px 6px;
   box-shadow:
     0 6px 11px -3px rgba(0, 0, 0, .62),
@@ -281,14 +280,14 @@ body.sustain-on .felt {
   text-align: center;
   font-size: 11px;
   letter-spacing: .02em;
-  color: #788597;
+  color: #768275;
   pointer-events: none;
 }
 
 .key.black .note-label {
   bottom: 6px;
   font-size: 9px;
-  color: #8b95a3;
+  color: #a3ada0;
 }
 
 .hide-note-label .note-label {
@@ -306,7 +305,7 @@ body.sustain-on .felt {
   font-size: 9px;
   line-height: 1.25;
   letter-spacing: .02em;
-  color: #aab2bf;
+  color: #a5afa0;
   pointer-events: none;
   -webkit-user-select: none;
   user-select: none;
@@ -318,7 +317,7 @@ body.sustain-on .felt {
 
 .key.black .key-hint {
   top: 5px;
-  color: #9fa8b6;
+  color: #a9b1a3;
 }
 
 .hide-key-hints .key-hint {
@@ -396,7 +395,7 @@ body.grand-staff {
   font-weight: 400;
   line-height: 1.18;
   letter-spacing: -.025em;
-  color: #000;
+  color: var(--ink);
   text-align: center;
   overflow-wrap: anywhere;
 }
@@ -408,7 +407,7 @@ body.grand-staff {
 
 .staff-line,
 .staff-ledger {
-  stroke: #2b3240;
+  stroke: var(--ink);
   stroke-width: 1.1;
 }
 
@@ -418,7 +417,7 @@ body.grand-staff {
 
 .clef-path {
   fill: none;
-  stroke: #1d2430;
+  stroke: var(--ink);
   stroke-width: 2.1;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -426,17 +425,17 @@ body.grand-staff {
 
 /* 谱号里实心的部分（中音谱号中央的梭形、低音谱号右侧的两个点） */
 .clef-fill {
-  fill: #1d2430;
+  fill: var(--ink);
   stroke: none;
 }
 
 /* 符头：实心、只有头（无符干），大小约等于线距 */
 .note-head {
-  fill: #161c26;
+  fill: var(--ink);
 }
 
 .staff-accidental {
-  fill: #161c26;
+  fill: var(--ink);
   font-family: "Times New Roman", "Songti SC", serif;
   text-anchor: middle;
   dominant-baseline: middle;
@@ -459,8 +458,8 @@ body.grand-staff {
   overflow: hidden;
   font-size: .9rem;
   letter-spacing: .06em;
-  color: #cbd3e0;
-  background: linear-gradient(180deg, #3a4049 0%, #23272e 100%);
+  color: #dce4d8;
+  background: linear-gradient(180deg, #39473d 0%, #282f2a 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .10);
   cursor: pointer;
   transition: background .22s ease, color .22s ease, height .3s var(--ease);
@@ -470,12 +469,12 @@ body.grand-staff {
 }
 
 .pedal:hover {
-  background: linear-gradient(180deg, #434a54 0%, #282d35 100%);
+  background: linear-gradient(180deg, #46554a 0%, #303c33 100%);
 }
 
 body.sustain-on .pedal {
-  color: #1b1f26;
-  background: linear-gradient(180deg, #f2f5fa 0%, #cdd5e1 100%);
+  color: var(--site-accent-dark);
+  background: linear-gradient(180deg, var(--site-accent-soft) 0%, var(--site-accent-selected) 100%);
 }
 
 /* 安全区仍给琴床留出空间，隐藏踏板时不留下文字或可点击区域。 */
@@ -496,8 +495,8 @@ body.pedal-hidden .pedal {
   place-items: center;
   width: 44px;
   height: 44px;
-  color: #000;
-  opacity: .78;
+  color: var(--ink);
+  border-radius: 12px;
   text-decoration: none;
   z-index: 10001;
 }
@@ -512,7 +511,8 @@ body.pedal-hidden .pedal {
 }
 
 .menu-back:hover {
-  opacity: 1;
+  color: var(--site-accent);
+  background: var(--site-accent-soft);
 }
 
 #settings-btn {
@@ -522,6 +522,7 @@ body.pedal-hidden .pedal {
   width: 44px;
   height: 44px;
   padding: 9px;
+  border-radius: 12px;
   cursor: pointer;
   z-index: 10001;
 }
@@ -532,6 +533,10 @@ body.pedal-hidden .pedal {
   height: 100%;
   opacity: .78;
   transition: transform .35s var(--ease), opacity .2s ease;
+}
+
+#settings-btn:hover {
+  background: var(--site-accent-soft);
 }
 
 #settings-btn:hover img {
@@ -555,12 +560,12 @@ body.pedal-hidden .pedal {
   height: min(610px, calc(100vh - 32px - env(safe-area-inset-top, 0px) - var(--safe-bottom)));
   height: min(610px, calc(100dvh - 32px - env(safe-area-inset-top, 0px) - var(--safe-bottom)));
 
-  background: linear-gradient(145deg, rgba(255, 255, 255, .76), rgba(250, 252, 255, .6));
+  background: linear-gradient(145deg, rgba(255, 255, 255, .76), rgba(244, 248, 243, .72));
   backdrop-filter: blur(22px) saturate(135%) brightness(1.1);
   -webkit-backdrop-filter: blur(22px) saturate(135%) brightness(1.1);
 
   border: 1px solid rgba(255, 255, 255, .85);
-  box-shadow: 0 18px 56px rgba(35, 47, 68, .12), inset 0 1px 0 #fff;
+  box-shadow: 0 18px 56px rgba(48, 62, 56, .12), inset 0 1px 0 #fff;
 
   border-radius: 22px;
   overflow: hidden;
@@ -614,7 +619,7 @@ body.pedal-hidden .pedal {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #bbc3ce transparent;
+  scrollbar-color: var(--site-line-strong) transparent;
   /* 没露出来的页不该被点到；顺手淡一点，翻页时更顺 */
   opacity: .3;
   pointer-events: none;
@@ -646,7 +651,7 @@ body.pedal-hidden .pedal {
   min-height: 52px;
   margin: 0;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(73, 88, 111, .07);
+  border-bottom: 1px solid var(--site-line);
 }
 
 .setting-item.has-sub {
@@ -657,7 +662,7 @@ body.pedal-hidden .pedal {
   min-width: 0;
   font-size: 14px;
   line-height: 1.5;
-  color: #475366;
+  color: var(--ink);
 }
 
 .setting-item input,
@@ -666,13 +671,13 @@ body.pedal-hidden .pedal {
   min-height: 36px;
   max-width: 52%;
   background: rgba(255, 255, 255, .7);
-  border: 1px solid rgba(73, 88, 111, .12);
+  border: 1px solid var(--site-line-strong);
   border-radius: 9px;
   padding: 6px 10px;
   color: inherit;
   font: inherit;
   font-size: 16px;
-  accent-color: #667c99;
+  accent-color: var(--site-accent);
   flex-shrink: 0;
 }
 
@@ -693,9 +698,9 @@ body.pedal-hidden .pedal {
   min-height: 24px;
   margin: 0;
   padding: 0;
-  border: 1px solid #b9c3d0;
+  border: 1px solid var(--site-line-strong);
   border-radius: 999px;
-  background: #d1d8e2;
+  background: #d3ddd1;
   cursor: pointer;
   transition: background .2s ease, border-color .2s ease;
 }
@@ -709,13 +714,13 @@ body.pedal-hidden .pedal {
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(35, 47, 68, .16);
+  box-shadow: 0 1px 3px rgba(48, 62, 56, .16);
   transition: transform .2s var(--ease);
 }
 
 .setting-item input[type="checkbox"]:checked {
-  border-color: #687e9c;
-  background: #687e9c;
+  border-color: var(--site-accent);
+  background: var(--site-accent);
 }
 
 .setting-item input[type="checkbox"]:checked::before {
@@ -780,7 +785,7 @@ body.pedal-hidden .pedal {
 }
 
 .sub-setting label {
-  color: #444;
+  color: var(--muted);
 }
 
 .sub-setting.show {
@@ -798,7 +803,7 @@ body.pedal-hidden .pedal {
 .setting-item select:focus-visible,
 .sub-btn:focus-visible,
 .back-btn:focus-visible {
-  outline: 2px solid #667c99;
+  outline: 2px solid var(--site-accent);
   outline-offset: 3px;
 }
 

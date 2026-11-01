@@ -2,12 +2,14 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
+  <meta name="theme-color" content="#f5f6f2">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="溢彩画：把相连的同色色块染成指定颜色，用有限步数让整幅图变成同一种颜色。支持自定义图形、随机出题、分享。" />
   <title>溢彩画</title>
 
   <link rel="icon" type="image/x-icon" href="../../assets/images/favicon.png">
-  <link rel="stylesheet" href="overflow_paint.css">
+  <link rel="stylesheet" href="../../assets/css/theme.css?v=20261017-1">
+  <link rel="stylesheet" href="overflow_paint.css?v=20261017-1">
 </head>
 
 <body>
@@ -15,8 +17,11 @@
 <div class="page">
 
   <header class="topbar">
-    <div class="title-block"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><h1>溢彩画</h1></div>
-    <a class="back-link" href="../../index.html" aria-label="返回主页" title="返回主页"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/></svg></a>
+    <div class="title-block">
+      <a class="back-link" href="../../index.html" aria-label="返回首页" title="返回首页"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6M8 12h12"/></svg></a>
+      <span class="app-mark" aria-hidden="true"><span class="brand-mark"><i></i><i></i><i></i><i></i></span></span>
+      <h1>溢彩画</h1>
+    </div>
   </header>
   <main class="layout">
     <section class="board-panel" aria-label="涂色板">
@@ -166,7 +171,7 @@
   </div>
 </div>
 
-<script src="js/core.js"></script>
+<script src="js/core.js?v=20261017-1"></script>
 <script src="js/generator.js"></script>
 <script src="js/solver.js"></script>
 <script src="js/minsteps.js"></script>

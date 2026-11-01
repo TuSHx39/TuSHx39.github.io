@@ -1,0 +1,29 @@
+/* Shared palette for every page; individual apps keep their own layout. */
+:root {
+  color-scheme: light;
+  --site-bg: #f5f6f2;
+  --site-surface: #ffffff;
+  --site-ink: #303e38;
+  --site-muted: #66776e;
+  --site-line: #e0e7df;
+  --site-line-strong: #c4d2c7;
+  --site-accent: #397d6b;
+  --site-accent-dark: #28604f;
+  --site-accent-soft: #e8f2eb;
+  --site-accent-wash: #f4f8f3;
+  --site-accent-selected: #dcece0;
+  --site-warm: #b67d35;
+  --site-warm-ink: #89612e;
+  --site-warm-soft: #faf1e3;
+  --site-danger: #b76154;
+  --site-font: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+html,
+body {
+  color: var(--site-ink);
+  background: var(--site-bg);
+  font-family: var(--site-font);
+}

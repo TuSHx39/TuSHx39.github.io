@@ -1,12 +1,12 @@
 :root {
   color-scheme: light;
-  --page: #f3f6fa;
-  --surface: #ffffff;
-  --ink: #24354d;
-  --muted: #637188;
-  --line: #dce4ed;
-  --focus: #356cba;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --page: var(--site-bg);
+  --surface: var(--site-surface);
+  --ink: var(--site-ink);
+  --muted: var(--site-muted);
+  --line: var(--site-line);
+  --focus: var(--site-accent);
+  font-family: var(--site-font);
   color: var(--ink);
   background: var(--page);
   font-synthesis: none;
@@ -25,14 +25,14 @@ body {
 .container {
   width: min(100% - 96px, 1120px);
   margin-inline: auto;
-  padding-block: clamp(48px, 10vh, 104px) 80px;
+  padding-block: clamp(40px, 7vh, 72px) 64px;
 }
 
 .header {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 64px;
+  margin-bottom: 44px;
 }
 
 .site-mark {
@@ -41,10 +41,10 @@ body {
   width: 48px;
   height: 48px;
   place-items: center;
-  border: 1px solid #cfddee;
+  border: 1px solid var(--site-line-strong);
   border-radius: 15px;
-  color: #5077ab;
-  background: #e6edf6;
+  color: var(--site-accent);
+  background: var(--site-accent-soft);
 }
 
 .site-mark svg {
@@ -74,11 +74,15 @@ body {
   font-weight: 400;
 }
 
+.category + .category {
+  margin-top: 36px;
+}
+
 .section-heading {
   display: flex;
   align-items: center;
   gap: 18px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
 .section-heading h2 {
@@ -97,15 +101,15 @@ body {
 /* auto-fill keeps card widths consistent as the collection grows. */
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
   gap: 24px;
 }
 
 .card {
-  --accent: #507bb6;
-  --art-bg: #edf2fa;
-  --art-line: #d2deef;
-  --art-shadow: #dbe5f3;
+  --accent: #5d8577;
+  --art-bg: #edf3ec;
+  --art-line: #ceded1;
+  --art-shadow: #dce8db;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -114,29 +118,29 @@ body {
   border-radius: 22px;
   color: inherit;
   background: var(--surface);
-  box-shadow: 0 3px 5px -4px #24354d24;
+  box-shadow: 0 3px 5px -4px #303e3824;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .card--paint {
-  --accent: #398a79;
-  --art-bg: #edf6f2;
-  --art-line: #cee3db;
-  --art-shadow: #d9eae3;
+  --accent: #a57265;
+  --art-bg: #f7efea;
+  --art-line: #e8d5cb;
+  --art-shadow: #efdfd5;
 }
 
 .card--metronome {
-  --accent: #bd8351;
-  --art-bg: #fbf3e8;
+  --accent: var(--site-warm);
+  --art-bg: var(--site-warm-soft);
   --art-line: #e8d6bc;
   --art-shadow: #efdfc8;
 }
 
 .card-art {
   display: grid;
-  min-height: 204px;
+  min-height: 164px;
   place-items: center;
   border-radius: 13px;
   background: var(--art-bg);
@@ -144,14 +148,14 @@ body {
 
 .tool-illustration {
   display: block;
-  width: 240px;
+  width: 216px;
   max-width: 100%;
   height: auto;
 }
 
 .card-content {
   flex: 1;
-  padding: 22px 16px 20px;
+  padding: 18px 16px;
 }
 
 .card-heading {
@@ -176,8 +180,8 @@ body {
   height: 28px;
   place-items: center;
   border-radius: 50%;
-  color: #7c899c;
-  background: #f3f6fa;
+  color: var(--muted);
+  background: var(--page);
   transition: color 160ms ease, background-color 160ms ease;
 }
 
@@ -212,7 +216,7 @@ body {
 @media (hover: hover) {
   .card:hover {
     border-color: var(--accent);
-    box-shadow: 0 8px 24px -16px #24354d50;
+    box-shadow: 0 8px 24px -16px #303e3850;
   }
 
   .card:hover .card-open {

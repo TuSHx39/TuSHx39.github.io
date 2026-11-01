@@ -19,7 +19,8 @@ export function readHtml() {
 
 /** 从 overflow_paint.html 中按出现顺序取出脚本路径 */
 export function scriptSources(html = readHtml()) {
-  return [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((match) => match[1]);
+  // 缓存版本属于 URL 查询参数，不是磁盘文件名的一部分。
+  return [...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((match) => match[1].split(/[?#]/, 1)[0]);
 }
 
 /**

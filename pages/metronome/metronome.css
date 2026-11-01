@@ -1,20 +1,20 @@
 :root {
   color-scheme: light;
-  --bg: #f5f6f2;
-  --surface: #ffffff;
-  --ink: #303e38;
-  --muted: #66776e;
-  --line: #e0e7df;
-  --accent: #397d6b;
-  --accent-dark: #28604f;
-  --accent-soft: #e8f2eb;
-  --accent-wash: #f4f8f3;
-  --accent-selected: #dcece0;
-  --warm: #b67d35;
-  --warm-ink: #89612e;
-  --warm-soft: #faf1e3;
-  --red: #b76154;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --bg: var(--site-bg);
+  --surface: var(--site-surface);
+  --ink: var(--site-ink);
+  --muted: var(--site-muted);
+  --line: var(--site-line);
+  --accent: var(--site-accent);
+  --accent-dark: var(--site-accent-dark);
+  --accent-soft: var(--site-accent-soft);
+  --accent-wash: var(--site-accent-wash);
+  --accent-selected: var(--site-accent-selected);
+  --warm: var(--site-warm);
+  --warm-ink: var(--site-warm-ink);
+  --warm-soft: var(--site-warm-soft);
+  --red: var(--site-danger);
+  font-family: var(--site-font);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
 }
@@ -221,7 +221,7 @@ kbd { font-family: inherit; font-size: 11px; line-height: 1; font-weight: 400; }
   .transport-controls { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .tempo-number input { font-size: 88px; }
   .play-area { grid-template-rows: none; grid-template-columns: 1.2fr 1fr; gap: 10px; }
-  .settings-workspace { display: flex; }
+  .settings-workspace { display: flex; align-items: stretch; }
 }
 @media (max-width: 560px) {
   .app-shell { padding: 20px 14px 32px; }
@@ -237,9 +237,10 @@ kbd { font-family: inherit; font-size: 11px; line-height: 1; font-weight: 400; }
   .transport-top { gap: 8px; }
   .playback-state { padding: 6px 9px; font-size: 11px; }
   .meter-controls { gap: 6px; font-size: 11px; }
-  .meter-controls select { width: 54px; padding-left: 8px; padding-right: 12px; font-size: 14px; }
+  .meter-controls select { width: 64px; padding-left: 8px; padding-right: 12px; font-size: 14px; }
   .visualization { margin-top: 22px; }
   .beat-label { padding-left: 5px; font-size: 21px; }
+  .beat-labels:has(> .beat-label:nth-child(9)) .beat-label { padding-left: 3px; font-size: 14px; }
   .rhythm-rail { height: 64px; border-radius: 10px; }
   .rail-note { top: 21px; height: 22px; }
   .rail-note.accent { top: 13px; height: 38px; }

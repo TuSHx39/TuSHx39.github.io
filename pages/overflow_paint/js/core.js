@@ -30,10 +30,10 @@
   const MAX_LIMIT = 15;
 
   const COLORS = [
-    { key: 'red', name: '红', hex: '#f2544b', mark: '●' },
-    { key: 'green', name: '绿', hex: '#37b24d', mark: '▲' },
-    { key: 'blue', name: '蓝', hex: '#3b7fd4', mark: '■' },
-    { key: 'yellow', name: '黄', hex: '#f2c037', mark: '★' },
+    { key: 'red', name: '红', hex: '#d9796b', mark: '●' },
+    { key: 'green', name: '绿', hex: '#69a383', mark: '▲' },
+    { key: 'blue', name: '蓝', hex: '#729fc5', mark: '■' },
+    { key: 'yellow', name: '黄', hex: '#e6bd63', mark: '★' },
   ];
 
   function isValidColor(value) {
